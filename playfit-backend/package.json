@@ -1,0 +1,24 @@
+{
+  "name": "playfit-backend",
+  "version": "0.5.0",
+  "private": true,
+  "description": "PlayFit - backend (API Gateway + 4 microservicios)",
+  "workspaces": [
+    "shared",
+    "gateway",
+    "services/*"
+  ],
+  "scripts": {
+    "setup": "node scripts/setup-env.js",
+    "dev": "node scripts/dev.js",
+    "smoke": "node scripts/smoke.js",
+    "test": "node --test --test-concurrency=1 tests/*.test.js",
+    "db:reset": "node shared/src/dbReset.js",
+    "video": "node scripts/set-video.js",
+    "start:gateway": "node gateway/src/server.js",
+    "start:auth": "node services/auth-service/src/server.js",
+    "start:clinical": "node services/clinical-service/src/server.js",
+    "start:social": "node services/social-service/src/server.js",
+    "start:content": "node services/content-service/src/server.js"
+  }
+}

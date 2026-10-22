@@ -1,0 +1,13 @@
+{
+  "name": "@playfit/gateway",
+  "version": "0.4.0",
+  "main": "src/index.js",
+  "dependencies": {
+    "@playfit/shared": "*",
+    "express": "^5.1.0",
+    "helmet": "^8.0.0",
+    "cors": "^2.8.5",
+    "express-rate-limit": "^7.5.0",
+    "http-proxy-middleware": "^3.0.5"
+  }
+}

@@ -1,0 +1,2 @@
+{ "name": "@playfit/social-service", "version": "0.4.0", "main": "src/index.js",
+  "dependencies": { "@playfit/shared": "*" } }

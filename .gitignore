@@ -1,0 +1,7 @@
+   .env
+   node_modules/
+   *.log
+   *.zip
+   *.jks
+   key.properties
+   Thumbs.db

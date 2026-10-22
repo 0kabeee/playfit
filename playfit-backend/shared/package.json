@@ -1,0 +1,12 @@
+{
+  "name": "@playfit/shared",
+  "version": "0.4.0",
+  "main": "src/index.js",
+  "dependencies": {
+    "sequelize": "^6.37.0",
+    "mysql2": "^3.9.0",
+    "express": "^5.1.0",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2"
+  }
+}
