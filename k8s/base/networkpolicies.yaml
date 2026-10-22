@@ -1,0 +1,56 @@
+# Firewall interno del cluster (RNF-04 del documento): por defecto NADIE puede hablar con nadie y se abren
+# solo los caminos necesarios. Nota: Docker Desktop no aplica NetworkPolicies; en AKS si (con Cilium).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: denegar-todo-por-defecto
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress"]
+---
+# MariaDB: solo los 4 microservicios (y sus init containers) y el respaldo nocturno
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mariadb-solo-desde-servicios
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: mariadb }
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { playfit/tier: service } }
+        - podSelector: { matchLabels: { playfit/tier: backup } }
+      ports:
+        - { protocol: TCP, port: 3306 }
+---
+# Microservicios: solo el gateway puede llamarlos (la app nunca los ve)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: servicios-solo-desde-gateway
+spec:
+  podSelector:
+    matchLabels: { playfit/tier: service }
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { playfit/tier: gateway } }
+      ports:
+        - { protocol: TCP, port: 3001 }
+        - { protocol: TCP, port: 3002 }
+        - { protocol: TCP, port: 3003 }
+        - { protocol: TCP, port: 3004 }
+---
+# Gateway: en local se abre a todos; el overlay de Azure lo restringe a Caddy (HTTPS)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gateway-entrada
+spec:
+  podSelector:
+    matchLabels: { playfit/tier: gateway }
+  policyTypes: ["Ingress"]
+  ingress:
+    - ports:
+        - { protocol: TCP, port: 3000 }

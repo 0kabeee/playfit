@@ -22,10 +22,14 @@ function createGateway({
   limiteAuth = 10,                 // intentos de login/registro/refresh por ventana y por IP
   ventanaAuthMs = 15 * 60 * 1000,
   timeoutMs = 15000,
+  trustProxy = false,              // en la nube va detras de Caddy (HTTPS): 1 = confiar en ese unico salto
   log = process.env.LOG_HTTP !== '0'
 }) {
   const app = express();
   app.disable('x-powered-by');
+  // Detras de un proxy (Caddy en Kubernetes) todas las peticiones llegarian con la IP del proxy y los limites
+  // por IP serian compartidos por TODOS los usuarios: con trust proxy = 1 se usa la IP real (X-Forwarded-For).
+  app.set('trust proxy', trustProxy);
   app.use(helmet());
   app.use(cors({ origin: corsOrigins.length ? corsOrigins : false, methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], allowedHeaders: ['Content-Type', 'Authorization'], maxAge: 600 }));
 

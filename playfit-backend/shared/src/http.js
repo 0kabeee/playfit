@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const jwt = require('jsonwebtoken');
 const { AppError, E } = require('./errors');
 const db = require('./db');
+const { trustProxy } = require('./net');
 
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
@@ -77,7 +78,9 @@ function errorHandler(err, req, res, next) {
 function createServiceApp(nombre, registrar) {
   const app = express();
   app.disable('x-powered-by');
-  app.set('trust proxy', 'loopback'); // el unico que nos llama es el gateway local
+  // Quien nos llama es el gateway: en el PC es local (loopback); en Docker/Kubernetes llega por la red interna
+  // del cluster (TRUST_PROXY=uniquelocal). Sirve para que la auditoria guarde la IP real del cliente.
+  app.set('trust proxy', trustProxy(process.env.TRUST_PROXY, 'loopback'));
   app.use(helmet());
   if (process.env.LOG_HTTP !== '0') {
     app.use((req, res, next) => { // log minimo: jamas cuerpos ni tokens (hay datos de salud)
@@ -112,7 +115,9 @@ async function verificarEntorno({ clinico = false } = {}) {
   }
 }
 
-async function startServer(nombre, app, { puerto, host = '127.0.0.1', clinico = false, migrar = false } = {}) {
+// host: en el PC solo 127.0.0.1 (nadie de afuera llega a los servicios); en contenedores SERVICE_HOST=0.0.0.0
+// porque el gateway los llama por la red interna (y en Kubernetes una NetworkPolicy deja entrar solo al gateway).
+async function startServer(nombre, app, { puerto, host = process.env.SERVICE_HOST || '127.0.0.1', clinico = false, migrar = false } = {}) {
   try { await verificarEntorno({ clinico }); if (migrar) await require('./migrate').aplicar(); }
   catch (e) { console.error(`\n[${nombre}] NO PUDE ARRANCAR\n${e.message}\n`); process.exit(1); }
   const server = app.listen(puerto, host, (err) => { if (!err) console.log(`[${nombre}] escuchando en http://${host}:${puerto}`); }); // Express 5 llama este callback tambien si falla

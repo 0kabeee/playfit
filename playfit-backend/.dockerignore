@@ -1,0 +1,10 @@
+# Nada de secretos ni dependencias del PC dentro de la imagen
+.env
+.env.*
+!.env.example
+**/node_modules
+tests
+k8s
+*.log
+*.zip
+.git

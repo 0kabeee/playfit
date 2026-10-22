@@ -1,0 +1,465 @@
+# Gateway + 4 microservicios. Todos usan la MISMA imagen (playfit-backend) con un comando distinto.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth
+  labels: { app.kubernetes.io/name: auth, app.kubernetes.io/part-of: playfit, playfit/tier: service }
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels: { app.kubernetes.io/name: auth }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: auth, app.kubernetes.io/part-of: playfit, playfit/tier: service }
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        # Antes de arrancar: espera a MariaDB, crea el esquema si la base esta vacia y aplica migraciones.
+        # Es idempotente y usa un candado, asi que correrlo en cada pod no borra ni duplica nada.
+        - name: db-init
+          image: playfit-backend
+          command: ["node", "scripts/db-init.js"]
+          envFrom:
+            - configMapRef: { name: playfit-config }
+          env:
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: playfit-secrets
+                  key: DB_PASS
+            - name: DEMO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: playfit-secrets
+                  key: DEMO_PASSWORD
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      containers:
+        - name: auth
+          image: playfit-backend
+          command: ["node", "services/auth-service/src/server.js"]
+          ports:
+            - name: http
+              containerPort: 3001
+          envFrom:
+            - configMapRef: { name: playfit-config }
+          env:
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: playfit-secrets
+                  key: DB_PASS
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: playfit-secrets
+                  key: JWT_SECRET
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            tcpSocket: { port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 25m, memory: 80Mi }
+            limits: { memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth
+  labels: { app.kubernetes.io/name: auth, app.kubernetes.io/part-of: playfit }
+spec:
+  selector: { app.kubernetes.io/name: auth }
+  ports:
+    - name: http
+      port: 3001
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clinical
+  labels: { app.kubernetes.io/name: clinical, app.kubernetes.io/part-of: playfit, playfit/tier: service }
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels: { app.kubernetes.io/name: clinical }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: clinical, app.kubernetes.io/part-of: playfit, playfit/tier: service }
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        # Antes de arrancar: espera a MariaDB, crea el esquema si la base esta vacia y aplica migraciones.
+        # Es idempotente y usa un candado, asi que correrlo en cada pod no borra ni duplica nada.
+        - name: db-init
+          image: playfit-backend
+          command: ["node", "scripts/db-init.js"]
+          envFrom:
+            - configMapRef: { name: playfit-config }
+          env:
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: playfit-secrets
+                  key: DB_PASS
+            - name: DEMO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: playfit-secrets
+                  key: DEMO_PASSWORD
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      containers:
+        - name: clinical
+          image: playfit-backend
+          command: ["node", "services/clinical-service/src/server.js"]
+          ports:
+            - name: http
+              containerPort: 3002
+          envFrom:
+            - configMapRef: { name: playfit-config }
+          env:
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: playfit-secrets
+                  key: DB_PASS
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: playfit-secrets
+                  key: JWT_SECRET
+            - name: CLINICAL_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: playfit-secrets
+                  key: CLINICAL_KEY
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            tcpSocket: { port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 25m, memory: 80Mi }
+            limits: { memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clinical
+  labels: { app.kubernetes.io/name: clinical, app.kubernetes.io/part-of: playfit }
+spec:
+  selector: { app.kubernetes.io/name: clinical }
+  ports:
+    - name: http
+      port: 3002
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: social
+  labels: { app.kubernetes.io/name: social, app.kubernetes.io/part-of: playfit, playfit/tier: service }
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels: { app.kubernetes.io/name: social }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: social, app.kubernetes.io/part-of: playfit, playfit/tier: service }
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        # Antes de arrancar: espera a MariaDB, crea el esquema si la base esta vacia y aplica migraciones.
+        # Es idempotente y usa un candado, asi que correrlo en cada pod no borra ni duplica nada.
+        - name: db-init
+          image: playfit-backend
+          command: ["node", "scripts/db-init.js"]
+          envFrom:
+            - configMapRef: { name: playfit-config }
+          env:
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: playfit-secrets
+                  key: DB_PASS
+            - name: DEMO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: playfit-secrets
+                  key: DEMO_PASSWORD
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      containers:
+        - name: social
+          image: playfit-backend
+          command: ["node", "services/social-service/src/server.js"]
+          ports:
+            - name: http
+              containerPort: 3003
+          envFrom:
+            - configMapRef: { name: playfit-config }
+          env:
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: playfit-secrets
+                  key: DB_PASS
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: playfit-secrets
+                  key: JWT_SECRET
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            tcpSocket: { port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 25m, memory: 80Mi }
+            limits: { memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: social
+  labels: { app.kubernetes.io/name: social, app.kubernetes.io/part-of: playfit }
+spec:
+  selector: { app.kubernetes.io/name: social }
+  ports:
+    - name: http
+      port: 3003
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: content
+  labels: { app.kubernetes.io/name: content, app.kubernetes.io/part-of: playfit, playfit/tier: service }
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels: { app.kubernetes.io/name: content }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: content, app.kubernetes.io/part-of: playfit, playfit/tier: service }
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        # Antes de arrancar: espera a MariaDB, crea el esquema si la base esta vacia y aplica migraciones.
+        # Es idempotente y usa un candado, asi que correrlo en cada pod no borra ni duplica nada.
+        - name: db-init
+          image: playfit-backend
+          command: ["node", "scripts/db-init.js"]
+          envFrom:
+            - configMapRef: { name: playfit-config }
+          env:
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: playfit-secrets
+                  key: DB_PASS
+            - name: DEMO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: playfit-secrets
+                  key: DEMO_PASSWORD
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      containers:
+        - name: content
+          image: playfit-backend
+          command: ["node", "services/content-service/src/server.js"]
+          ports:
+            - name: http
+              containerPort: 3004
+          envFrom:
+            - configMapRef: { name: playfit-config }
+          env:
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: playfit-secrets
+                  key: DB_PASS
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: playfit-secrets
+                  key: JWT_SECRET
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: playfit-secrets
+                  key: GEMINI_API_KEY
+                  optional: true
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            tcpSocket: { port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 25m, memory: 80Mi }
+            limits: { memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: content
+  labels: { app.kubernetes.io/name: content, app.kubernetes.io/part-of: playfit }
+spec:
+  selector: { app.kubernetes.io/name: content }
+  ports:
+    - name: http
+      port: 3004
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  labels: { app.kubernetes.io/name: gateway, app.kubernetes.io/part-of: playfit, playfit/tier: gateway }
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels: { app.kubernetes.io/name: gateway }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: gateway, app.kubernetes.io/part-of: playfit, playfit/tier: gateway }
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: gateway
+          image: playfit-backend
+          command: ["node", "gateway/src/server.js"]
+          ports:
+            - name: http
+              containerPort: 3000
+          envFrom:
+            - configMapRef: { name: playfit-config }
+          readinessProbe:
+            # el /health del gateway devuelve 503 si UN servicio cae; el gateway debe seguir atendiendo (modo degradado)
+            tcpSocket: { port: http }
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 25m, memory: 80Mi }
+            limits: { memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  labels: { app.kubernetes.io/name: gateway, app.kubernetes.io/part-of: playfit }
+spec:
+  selector: { app.kubernetes.io/name: gateway }
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http

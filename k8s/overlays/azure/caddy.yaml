@@ -1,0 +1,93 @@
+# Puerta de entrada publica en Azure: IP publica + subdominio gratuito de Azure + HTTPS automatico.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: caddy-datos      # guarda los certificados (evita pedirlos de nuevo en cada reinicio)
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: caddy
+  labels: { app.kubernetes.io/name: caddy, app.kubernetes.io/part-of: playfit-edge }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }   # el disco solo se monta en un pod a la vez
+  selector:
+    matchLabels: { app.kubernetes.io/name: caddy }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: caddy, app.kubernetes.io/part-of: playfit-edge }
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: caddy
+          image: caddy:2.10
+          ports:
+            - { name: http, containerPort: 8080 }
+            - { name: https, containerPort: 8443 }
+          env:
+            - name: PLAYFIT_DOMAIN
+              valueFrom: { configMapKeyRef: { name: caddy-config, key: PLAYFIT_DOMAIN } }
+          readinessProbe:
+            tcpSocket: { port: https }
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 25m, memory: 40Mi }
+            limits: { memory: 128Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: caddyfile, mountPath: /etc/caddy/Caddyfile, subPath: Caddyfile }
+            - { name: datos, mountPath: /data }
+            - { name: config, mountPath: /config }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: caddyfile
+          configMap: { name: caddy-config }
+        - name: datos
+          persistentVolumeClaim: { claimName: caddy-datos }
+        - name: config
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: caddy
+  annotations:
+    # Subdominio gratis: NOMBRE.REGION.cloudapp.azure.com (debe coincidir con PLAYFIT_DOMAIN)
+    service.beta.kubernetes.io/azure-dns-label-name: playfit-usb   # <-- CAMBIA (debe ser unico en la region)
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local   # conserva la IP real del cliente
+  selector: { app.kubernetes.io/name: caddy }
+  ports:
+    - { name: http, port: 80, targetPort: http }
+    - { name: https, port: 443, targetPort: https }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: caddy-entrada-publica
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: caddy }
+  policyTypes: ["Ingress"]
+  ingress:
+    - ports:
+        - { protocol: TCP, port: 8080 }
+        - { protocol: TCP, port: 8443 }

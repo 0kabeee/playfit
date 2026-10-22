@@ -1,0 +1,84 @@
+# PlayFit en contenedores en tu PC (Docker Desktop). Uso:
+#   docker compose up --build        (la primera vez tarda; luego basta "docker compose up")
+#   docker compose down              (detiene; los datos quedan en el volumen "playfit-db")
+#   docker compose down -v           (detiene y BORRA la base de datos de los contenedores)
+# Toma DB_PASS, JWT_SECRET, CLINICAL_KEY, GEMINI_API_KEY... de tu archivo .env (el mismo de "npm run dev").
+# Esta base es OTRA distinta a tu MariaDB del PC: empieza con los datos de ejemplo.
+name: playfit
+
+x-backend: &backend
+  build: .
+  image: playfit-backend:dev
+  restart: unless-stopped
+  env_file: .env
+  environment: &backend-env
+    DB_HOST: db
+    DB_PORT: "3306"
+    SERVICE_HOST: 0.0.0.0
+    TRUST_PROXY: uniquelocal
+    AUTH_URL: http://auth:3001
+    CLINICAL_URL: http://clinical:3002
+    SOCIAL_URL: http://social:3003
+    CONTENT_URL: http://content:3004
+  depends_on:
+    db-init:
+      condition: service_completed_successfully
+
+services:
+  db:
+    image: mariadb:11.8
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${DB_NAME:-playfit_dev}
+      MARIADB_USER: ${DB_USER:-playfit_app}
+      MARIADB_PASSWORD: ${DB_PASS:?Falta DB_PASS en el .env}
+      MARIADB_RANDOM_ROOT_PASSWORD: "1"
+      TZ: UTC
+    volumes:
+      - playfit-db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    # Sin "ports": la base NO queda expuesta fuera de Docker (no choca con tu MariaDB del puerto 3307)
+
+  db-init:
+    <<: *backend
+    restart: "no"
+    command: ["node", "scripts/db-init.js"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  auth:
+    <<: *backend
+    command: ["node", "services/auth-service/src/server.js"]
+  clinical:
+    <<: *backend
+    command: ["node", "services/clinical-service/src/server.js"]
+  social:
+    <<: *backend
+    command: ["node", "services/social-service/src/server.js"]
+  content:
+    <<: *backend
+    command: ["node", "services/content-service/src/server.js"]
+
+  gateway:
+    <<: *backend
+    command: ["node", "gateway/src/server.js"]
+    environment:
+      <<: *backend-env
+      GATEWAY_HOST: 0.0.0.0
+      GATEWAY_PORT: "3000"
+    depends_on:
+      - auth
+      - clinical
+      - social
+      - content
+    # Unico puerto publicado. Si ya tienes "npm run dev" corriendo en el 3000, usa:  set COMPOSE_GATEWAY_PORT=3100
+    ports:
+      - "${COMPOSE_GATEWAY_PORT:-3000}:3000"
+
+volumes:
+  playfit-db:

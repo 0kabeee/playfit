@@ -1,0 +1,25 @@
+# Caddy: termina HTTPS con un certificado gratuito de Let's Encrypt (se renueva solo) y reenvia al gateway.
+# Escucha en 8080/8443 dentro del contenedor (sin root); el LoadBalancer de Azure publica 80 y 443.
+{
+	http_port 8080
+	https_port 8443
+	admin off
+	auto_https disable_redirects
+}
+
+http://{$PLAYFIT_DOMAIN} {
+	redir https://{host}{uri} permanent
+}
+
+{$PLAYFIT_DOMAIN} {
+	encode gzip
+	request_body {
+		max_size 1MB
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+	# Caddy reemplaza cualquier X-Forwarded-For que mande el cliente por su IP real (no se puede falsificar)
+	reverse_proxy gateway:3000
+}

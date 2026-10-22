@@ -1,0 +1,22 @@
+# Kubernetes de Docker Desktop en tu PC:  kubectl apply -k k8s/overlays/local
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: playfit
+resources:
+  - ../../base
+images:
+  - name: playfit-backend
+    newName: playfit-backend
+    newTag: dev            # la imagen que construyes con: docker build -t playfit-backend:dev playfit-backend
+secretGenerator:
+  - name: playfit-secrets
+    namespace: playfit
+    envs:
+      - secrets.env        # lo crea "node k8s/generar-secretos.js local" (NO se sube a Git)
+patches:
+  # En local el gateway se publica en http://localhost:3000 (Docker Desktop conecta los LoadBalancer a localhost)
+  - target: { kind: Service, name: gateway }
+    patch: |-
+      - op: add
+        path: /spec/type
+        value: LoadBalancer

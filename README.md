@@ -16,8 +16,9 @@ App móvil de **gamificación social** para que los estudiantes de la Universida
 
 | Carpeta | Contenido |
 |---|---|
-| [`playfit-backend/`](playfit-backend) | Node.js + MariaDB: API Gateway (puerto 3000) y 4 microservicios (auth, clinical, social, content). 89 pruebas automáticas. |
+| [`playfit-backend/`](playfit-backend) | Node.js + MariaDB: API Gateway (puerto 3000) y 4 microservicios (auth, clinical, social, content). 97 pruebas automáticas. Imagen Docker + `docker-compose.yml`. |
 | [`playfit_app/`](playfit_app) | App Flutter (Android). Solo rol estudiante. |
+| [`k8s/`](k8s) | Despliegue en Kubernetes: Docker Desktop (local) y Azure AKS con HTTPS. Guía en `k8s/README.md`. |
 
 Cada carpeta tiene su propio `README.md` con los detalles.
 
@@ -53,4 +54,5 @@ cd playfit_app && flutter test
 
 - La red social abierta/pública quedó fuera del alcance (trabajo futuro).
 - Para activar el chat de IA hay que poner una `GEMINI_API_KEY` propia en el `.env` del backend (guía en `playfit-backend/README.md`).
-- Nunca subas el `.env`, la llave de firma (`*.jks`) ni `android/key.properties`.
+- **En la nube (Azure):** el backend corre en Kubernetes (AKS) con MariaDB en el clúster y HTTPS; ver `k8s/README.md`.
+- Nunca subas el `.env`, los `secrets.env` de `k8s/`, la llave de firma (`*.jks`) ni `android/key.properties`.

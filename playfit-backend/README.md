@@ -1,13 +1,14 @@
-# PlayFit · Backend (Fase 7: seguridad reforzada sobre API REST + Gateway)
+# PlayFit · Backend (Fase 10: contenedores, Kubernetes y nube)
 
 Monorepo (`npm workspaces`): `shared/`, `gateway/` y 4 servicios en `services/` (auth, clinical, social, content).
-El celular/emulador habla SOLO con el gateway (puerto 3000); los servicios escuchan solo en 127.0.0.1.
+El celular/emulador habla SOLO con el gateway (puerto 3000); en el PC los servicios escuchan solo en 127.0.0.1.
+En contenedores (Docker / Kubernetes) ver la seccion **Contenedores** al final y `../k8s/README.md`.
 
 ## Primera vez
 ```
 npm install
 npm run setup -- --db-port=3307     (usa el puerto donde escucha TU MariaDB; crea .env con secretos aleatorios)
-npm test                            (88 pruebas; usan la BD playfit_test)
+npm test                            (97 pruebas; usan la BD playfit_test)
 ```
 > Guarda una copia de tu `.env`: la `CLINICAL_KEY` cifra los historiales clinicos; si se pierde, esos datos no se recuperan.
 
@@ -60,3 +61,20 @@ Elige videos de canales confiables (de preferencia el que recomiende tu docente)
 - **Base de datos caida = `503 BASE_DE_DATOS_NO_DISPONIBLE`** con mensaje claro (antes salia "error interno"; el detalle tecnico sigue en la consola del servidor).
 - Contrasena: el maximo de 72 se mide en bytes (limite real de bcrypt), no en caracteres.
 - Ya estaban desde la Fase 5: refresh tokens con rotacion y deteccion de reutilizacion, hashes SHA-256 en BD, bcrypt, JWT HS256 con 15 min de vida, cifrado AES-256-GCM del historial clinico, auditoria de lecturas.
+
+## Contenedores (Fase 10)
+Una sola imagen (`Dockerfile`) sirve para el gateway y los 4 servicios; cada contenedor arranca un proceso distinto.
+- **Docker Compose (PC):** `docker compose up --build` -> http://localhost:3000/health. Usa tu `.env`, pero con OTRA base
+  (MariaDB 11.8 en un contenedor, volumen `playfit-db`) que arranca con los datos de ejemplo. No expone la base fuera de Docker.
+  Si `npm run dev` ya ocupa el 3000: `set COMPOSE_GATEWAY_PORT=3100` antes de `docker compose up`.
+- **Kubernetes (Docker Desktop y Azure AKS):** guia completa en `../k8s/README.md`.
+- `npm run db:init` (lo usan los contenedores): crea el esquema y el seed **solo si la base esta vacia** y aplica las migraciones.
+  Nunca borra datos. Con `DEMO_PASSWORD` definido, todas las cuentas de ejemplo quedan con esa contrasena (en la nube nunca se usa la del README).
+
+Variables nuevas (opcionales en el PC; las fija el contenedor):
+| Variable | En el PC | En contenedores |
+|---|---|---|
+| `SERVICE_HOST` | `127.0.0.1` | `0.0.0.0` (el gateway llama a los servicios por la red interna) |
+| `TRUST_PROXY` | `loopback` | `uniquelocal` (la auditoria ve la IP real que reenvia el gateway) |
+| `GATEWAY_TRUST_PROXY` | `0` | `1` en Azure (detras de Caddy: los limites por IP usan la IP real del cliente) |
+| `DEMO_PASSWORD` | (vacio) | contrasena aleatoria de las cuentas de ejemplo |

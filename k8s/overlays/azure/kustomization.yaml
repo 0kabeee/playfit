@@ -1,0 +1,48 @@
+# Azure (AKS):  kubectl apply -k k8s/overlays/azure
+# ANTES de aplicar, cambia las lineas marcadas con  <-- CAMBIA  (ver k8s/README.md)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: playfit
+resources:
+  - ../../base
+  - caddy.yaml
+images:
+  - name: playfit-backend
+    newName: ghcr.io/0kabeee/playfit-backend   # <-- CAMBIA si la imagen esta en otra cuenta de GitHub
+    newTag: "1.0.0"                            # <-- CAMBIA cada vez que subas una version nueva
+secretGenerator:
+  - name: playfit-secrets
+    namespace: playfit
+    envs:
+      - secrets.env        # lo crea "node k8s/generar-secretos.js azure" (NO se sube a Git)
+configMapGenerator:
+  - name: caddy-config
+    namespace: playfit
+    files:
+      - Caddyfile
+    literals:
+      - PLAYFIT_DOMAIN=playfit-usb.eastus2.cloudapp.azure.com   # <-- CAMBIA (nombre + region que elijas)
+patches:
+  # El gateway queda detras de Caddy: confia en 1 salto para ver la IP real del cliente (limites por IP)
+  - target: { kind: ConfigMap, name: playfit-config }
+    patch: |-
+      - op: replace
+        path: /data/GATEWAY_TRUST_PROXY
+        value: "1"
+  # Solo Caddy (HTTPS) puede hablar con el gateway
+  - target: { kind: NetworkPolicy, name: gateway-entrada }
+    patch: |-
+      - op: replace
+        path: /spec/ingress
+        value:
+          - from:
+              - podSelector: { matchLabels: { app.kubernetes.io/name: caddy } }
+            ports:
+              - { protocol: TCP, port: 3000 }
+  # Credencial para descargar la imagen de GitHub (ghcr.io) si el paquete es privado
+  - target: { kind: Deployment, labelSelector: "app.kubernetes.io/part-of=playfit" }
+    patch: |-
+      - op: add
+        path: /spec/template/spec/imagePullSecrets
+        value:
+          - name: ghcr-pull
