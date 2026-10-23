@@ -5,6 +5,7 @@ module.exports = {
   crypto: require('./crypto'),
   rbac: require('./rbac'),
   audit: require('./audit'),
+  soporte: require('./soporte'),
   dbReset: require('./dbReset'),
   env: require('./env'),
   http: require('./http')

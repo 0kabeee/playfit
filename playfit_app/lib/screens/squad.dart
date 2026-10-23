@@ -1,4 +1,6 @@
 import '../common.dart';
+import 'crear_reto.dart';
+import 'duelos.dart';
 import 'ranking.dart';
 
 // ====================================================================== PESTAÑA SQUAD
@@ -95,6 +97,14 @@ class SquadTab extends StatelessWidget {
             const SizedBox(height: 6),
             PfButton('Invitar amigos', kind: BtnKind.gold, icon: 'plus', onPressed: () => _push(context, const InvitarScreen())),
             const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(child: PfButton('Crear reto', kind: BtnKind.secondary, icon: 'trophy', onPressed: () => _push(context, const CrearRetoSquadScreen()))),
+                const SizedBox(width: 10),
+                Expanded(child: PfButton('Duelos', kind: BtnKind.secondary, icon: 'target', onPressed: () => _push(context, const DuelosScreen()))),
+              ],
+            ),
+            const SizedBox(height: 10),
             PfButton('Ver ranking', kind: BtnKind.secondary, icon: 'bar-chart-3', onPressed: () => _push(context, const RankingScreen())),
             const SizedBox(height: 10),
             Center(
@@ -145,6 +155,12 @@ class SquadTab extends StatelessWidget {
         break;
       case 'union':
         texto = asBool(d['fundador']) ? '$nombre creó el squad' : '$nombre se unió al squad';
+        break;
+      case 'reto_creado':
+        texto = '$nombre creó el reto "${asStr(d['titulo'])}"';
+        break;
+      case 'duelo':
+        texto = '$nombre ganó un duelo';
         break;
       default:
         texto = '$nombre tuvo actividad';
@@ -496,6 +512,13 @@ class MiembroDetalleScreen extends StatelessWidget {
                           : (asNum(c['delta']) < 0 ? PfBadge('Te lleva ${Fmt.kg(-asNum(c['delta']))}', tone: 'orange') : const PfBadge('Igual', tone: 'grey')),
                     ),
                 ]),
+            ],
+            if (!yo) ...[
+              const SizedBox(height: 6),
+              PfButton('Retar a $nombre a un duelo', kind: BtnKind.gold, icon: 'target', onPressed: () {
+                Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => RetarScreen(rivalId: id)));
+              }),
+              const SizedBox(height: 10),
             ],
             const SizedBox(height: 4),
             const PanelNote('Solo se comparten estadísticas de entrenamiento. Nunca tu historial clínico ni tu peso corporal.', icon: 'shield-check'),

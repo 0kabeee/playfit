@@ -3,7 +3,7 @@
 //  - Si la base esta vacia: crea el esquema y carga el catalogo + datos de ejemplo (02_seed.sql).
 //    Si DEMO_PASSWORD esta definido, TODAS las cuentas del seed quedan con esa contrasena (en la nube nunca se
 //    deja la contrasena publica del README).
-//  - Siempre aplica las migraciones idempotentes (03_fase7.sql y 04_fase11.sql).
+//  - Siempre aplica las migraciones idempotentes (03_fase7.sql, 04_fase11.sql y 05_fase12.sql).
 // Usa un candado de MariaDB (GET_LOCK) para que dos copias corriendo a la vez no se pisen.
 // Uso:  node scripts/db-init.js        (lee la configuracion del entorno o del .env)
 const fs = require('fs');
@@ -13,6 +13,7 @@ require('@playfit/shared/src/env').load();
 const { Sequelize, QueryTypes } = require('sequelize');
 
 const DIR_SQL = path.join(__dirname, '..', 'database');
+const { ARCHIVOS: MIGRACIONES } = require('@playfit/shared/src/migrate');
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function conexion() {
@@ -62,8 +63,7 @@ async function inicializar({ sql = conexion(), demoPassword = process.env.DEMO_P
     } else {
       log('[db-init] la base ya tiene datos: no se toca el esquema.');
     }
-    await sql.query(fs.readFileSync(path.join(DIR_SQL, '03_fase7.sql'), 'utf8')); // idempotente
-    await sql.query(fs.readFileSync(path.join(DIR_SQL, '04_fase11.sql'), 'utf8')); // idempotente
+    for (const a of MIGRACIONES) await sql.query(fs.readFileSync(path.join(DIR_SQL, a), 'utf8')); // idempotentes
     log('[db-init] listo.');
     return { creada };
   } finally {

@@ -1,4 +1,6 @@
 import '../common.dart';
+import 'duelos.dart';
+import 'soporte.dart';
 
 class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});
@@ -15,6 +17,10 @@ class NotificationsScreen extends StatelessWidget {
         return 'trophy';
       case 'squad':
         return 'users';
+      case 'duelo':
+        return 'target';
+      case 'soporte':
+        return 'message-circle';
       default:
         return 'bell';
     }
@@ -32,6 +38,10 @@ class NotificationsScreen extends StatelessWidget {
         return 'purple';
       case 'squad':
         return 'blue';
+      case 'duelo':
+        return 'orange';
+      case 'soporte':
+        return 'green';
       default:
         return 'grey';
     }
@@ -68,6 +78,12 @@ class NotificationsScreen extends StatelessWidget {
                       Fmt.relative(asStr(n['created_at'])),
                     ].join(' · '),
                     left: IconDisc(_icon(asStr(n['tipo'])), tone: _tone(asStr(n['tipo']))),
+                    chevron: asStr(n['tipo']) == 'duelo' || asStr(n['tipo']) == 'soporte',
+                    onTap: asStr(n['tipo']) == 'duelo'
+                        ? () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const DuelosScreen()))
+                        : (asStr(n['tipo']) == 'soporte'
+                            ? () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const SoporteScreen()))
+                            : null),
                     right: asBool(n['leida'])
                         ? null
                         : Container(width: 9, height: 9, decoration: const BoxDecoration(color: C.gold, shape: BoxShape.circle)),

@@ -1,3 +1,4 @@
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../common.dart';
@@ -242,6 +243,18 @@ class _TwoFactorSetupScreenState extends State<TwoFactorSetupScreen> {
         const SizedBox(height: 14),
         Text('2. Agrega PlayFit', style: Tx.body(size: 13.5, w: FontWeight.w800)),
         const SizedBox(height: 8),
+        if (asStr(cfg['otpauth_uri']).isNotEmpty) ...[
+          Text('Escanea este código QR con tu app de autenticación (desde otro dispositivo, como tu celular):', style: Tx.body(size: 12.5, color: C.inkSoft)),
+          const SizedBox(height: 8),
+          Center(
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+              child: QrImageView(data: asStr(cfg['otpauth_uri']), size: 180, backgroundColor: Colors.white),
+            ),
+          ),
+          const SizedBox(height: 10),
+        ],
         PfButton('Abrir mi app de autenticación', kind: BtnKind.secondary, onPressed: _openAuthenticator),
         const SizedBox(height: 8),
         Text('O escribe esta clave a mano en tu app:', style: Tx.body(size: 12.5, color: C.inkSoft)),
@@ -257,6 +270,9 @@ class _TwoFactorSetupScreenState extends State<TwoFactorSetupScreen> {
             ],
           ),
         ),
+        const SizedBox(height: 6),
+        Text('Si la escribes a mano: la clave solo tiene letras (A–Z) y los números 2 al 7. Donde veas algo parecido a un cero es la letra O. Mejor usa el botón de copiar y pégala.',
+            style: Tx.body(size: 11.5, color: C.inkSoft)),
         const SizedBox(height: 14),
         Text('3. Escribe el código que te muestra', style: Tx.body(size: 13.5, w: FontWeight.w800)),
         const SizedBox(height: 8),

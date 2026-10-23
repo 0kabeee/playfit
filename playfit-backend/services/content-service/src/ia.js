@@ -3,7 +3,8 @@
 //  2) Requiere consentimiento 'ia_chatbot' vigente.
 //  3) Cuota diaria por estudiante para no agotar el free tier.
 //  4) Mensajes con senales de alarma NO se envian al modelo: se responde con un aviso fijo.
-const { one, select, insert, run, tx, E, AppError, rbac } = require('@playfit/shared');
+//  5) Mensajes sobre PAGOS / Premium tampoco van al modelo: se transfieren a un humano (chat de Soporte, Fase 12).
+const { one, select, insert, run, tx, E, AppError, rbac, soporte } = require('@playfit/shared');
 
 const MAX_MENSAJE = 1000;
 const limiteDiario = () => Number(process.env.IA_LIMITE_DIARIO || 20);
@@ -43,6 +44,23 @@ async function chat(actor, { conversacionId = null, mensaje } = {}, { llm } = {}
     if (!conv) throw E.notFound('Conversacion no encontrada');
   }
 
+  // Pagos: "Un momento, ya te transfiero a un asistente humano" -> la conversacion llega a la bandeja del admin.
+  // No gasta cuota ni se envia nada al modelo.
+  if (!detectarEmergencia(mensaje) && soporte.detectarPago(mensaje)) {
+    return tx(async (t) => {
+      const convId = conv ? conv.id : await insert('INSERT INTO conversaciones_ia (estudiante_id,titulo) VALUES (:e,:t)', { e: actor.id, t: mensaje.trim().slice(0, 100) }, t);
+      await insert(`INSERT INTO mensajes_ia (conversacion_id,rol,contenido) VALUES (:c,'usuario',:m)`, { c: convId, m: mensaje.trim() }, t);
+      await insert(`INSERT INTO mensajes_ia (conversacion_id,rol,contenido) VALUES (:c,'modelo',:m)`, { c: convId, m: soporte.MSG_TRANSFERENCIA }, t);
+      const soporteId = await soporte.transferirDesdeIa(actor.id, mensaje.trim(), 'pago', t);
+      const uso = await one('SELECT solicitudes FROM ia_uso_diario WHERE estudiante_id=:e AND fecha=CURDATE()', { e: actor.id }, t);
+      return {
+        conversacion_id: convId, respuesta: soporte.MSG_TRANSFERENCIA, alerta_salud: false,
+        transferido_a_soporte: true, soporte_conversacion_id: soporteId,
+        restantes_hoy: Math.max(0, limiteDiario() - Number(uso ? uso.solicitudes : 0))
+      };
+    });
+  }
+
   // Cuota atomica: se reserva ANTES de llamar al modelo; si el modelo falla se devuelve.
   await run('INSERT INTO ia_uso_diario (estudiante_id,fecha,solicitudes) VALUES (:e,CURDATE(),0) ON DUPLICATE KEY UPDATE solicitudes=solicitudes', { e: actor.id });
   const reserva = await run('UPDATE ia_uso_diario SET solicitudes=solicitudes+1 WHERE estudiante_id=:e AND fecha=CURDATE() AND solicitudes < :l', { e: actor.id, l: limiteDiario() });
@@ -73,7 +91,7 @@ async function chat(actor, { conversacionId = null, mensaje } = {}, { llm } = {}
     await insert(`INSERT INTO mensajes_ia (conversacion_id,rol,contenido,flags_aplicados) VALUES (:c,'modelo',:m,:f)`,
       { c: convId, m: respuesta, f: flagsAplicados.length ? JSON.stringify(flagsAplicados) : null }, t);
     const uso = await one('SELECT solicitudes FROM ia_uso_diario WHERE estudiante_id=:e AND fecha=CURDATE()', { e: actor.id }, t);
-    return { conversacion_id: convId, respuesta, alerta_salud: alarma, restantes_hoy: Math.max(0, limiteDiario() - Number(uso.solicitudes)) };
+    return { conversacion_id: convId, respuesta, alerta_salud: alarma, transferido_a_soporte: false, restantes_hoy: Math.max(0, limiteDiario() - Number(uso.solicitudes)) };
   });
 }
 

@@ -51,16 +51,17 @@ async function detalleReto(actor, retoId) {
   const hoy = clock.hoy();
   const r = await one('SELECT r.*, e.nombre AS ejercicio FROM retos r LEFT JOIN ejercicios e ON e.id=r.ejercicio_id WHERE r.id=:id AND r.activo=1', { id: retoId });
   if (!r) throw E.notFound('Reto no encontrado');
-  const mio = await one('SELECT progreso, completado_at FROM reto_participaciones WHERE reto_id=:r AND estudiante_id=:e', { r: retoId, e: actor.id });
   const sq = await H.squadDe(actor.id);
+  if (r.squad_id && (!sq || sq.squad_id !== r.squad_id)) throw E.notFound('Reto no encontrado'); // los retos de otro squad no existen para ti
+  const mio = await one('SELECT progreso, completado_at FROM reto_participaciones WHERE reto_id=:r AND estudiante_id=:e', { r: retoId, e: actor.id });
   const total = Number((await one('SELECT COUNT(*) AS n FROM reto_participaciones WHERE reto_id=:r', { r: retoId })).n);
   let participantes = [], progreso = mio ? Number(mio.progreso) : 0;
-  if (r.tipo === 'squad' && sq) { // en retos de squad solo se muestran los companeros del propio squad
+  if ((r.tipo === 'squad' || r.squad_id) && sq) { // en retos de squad solo se muestran los companeros del propio squad
     const filas = await select(
       `SELECT u.id, u.nombre, u.apellido, rp.progreso, rp.completado_at FROM reto_participaciones rp JOIN usuarios u ON u.id=rp.estudiante_id
        WHERE rp.reto_id=:r AND rp.squad_id=:s ORDER BY rp.progreso DESC, u.nombre`, { r: retoId, s: sq.squad_id });
     participantes = filas.map((f) => ({ id: f.id, nombre: f.nombre, apellido: f.apellido, progreso: Number(f.progreso), completado: !!f.completado_at, es_yo: f.id === actor.id }));
-    progreso = participantes.reduce((a, p) => a + p.progreso, 0);
+    if (r.tipo === 'squad') progreso = participantes.reduce((a, p) => a + p.progreso, 0); // meta colectiva
   }
   return {
     id: r.id, titulo: r.titulo, descripcion: r.descripcion, tipo: r.tipo, metrica: r.metrica, ejercicio: r.ejercicio,
@@ -69,7 +70,8 @@ async function detalleReto(actor, retoId) {
     participa: !!mio, completado: !!(mio && mio.completado_at), mi_progreso: mio ? Number(mio.progreso) : 0,
     progreso, porcentaje: Math.min(100, Math.round((progreso / r.meta) * 100)),
     puede_unirse: !mio && r.fecha_fin >= hoy && !(r.tipo === 'squad' && !sq),
-    participantes_total: total, participantes
+    participantes_total: total, participantes,
+    de_squad: !!r.squad_id, puede_cancelar: !!r.squad_id && (r.creado_por === actor.id || sq.lider_id === actor.id)
   };
 }
 

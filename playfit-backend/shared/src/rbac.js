@@ -2,10 +2,10 @@
 const PERMISOS = {
   estudiante: [
     'perfil:leer_propio', 'sesion:crear_propia', 'squad:gestionar_propio', 'reto:unirse', 'ranking:ver',
-    'clinico:leer_propio', 'clinico:escribir_propio', 'ia:usar', 'contenido:ver'
+    'clinico:leer_propio', 'clinico:escribir_propio', 'ia:usar', 'contenido:ver', 'soporte:usar'
   ],
   admin: [
-    'usuario:gestionar', 'reto:crear', 'contenido:gestionar', 'ranking:ver', 'auditoria:ver', 'metricas:ver'
+    'usuario:gestionar', 'reto:crear', 'contenido:gestionar', 'ranking:ver', 'auditoria:ver', 'metricas:ver', 'soporte:atender'
   ]
 };
 const { E } = require('./errors');

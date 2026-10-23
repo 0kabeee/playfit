@@ -1,4 +1,6 @@
 import '../common.dart';
+import 'crear_reto.dart';
+import 'duelos.dart';
 import 'sesiones.dart';
 
 // ====================================================================== PESTAÑA RETOS
@@ -30,7 +32,17 @@ class _RetosTabState extends State<RetosTab> {
   @override
   Widget build(BuildContext context) {
     return LoadView<Map<String, dynamic>>(
-      loader: () async => asMap(await app.api.get('/api/social/challenges')),
+      loader: () async {
+        final data = asMap(await app.api.get('/api/social/challenges'));
+        try {
+          final duelos = asMap(await app.api.get('/api/social/duels'));
+          data['_duelos_recibidos'] = asList(duelos['recibidos']).length;
+          data['_duelos_activos'] = asList(duelos['activos']).length;
+        } catch (_) {
+          // si falla, la pestaña de retos se muestra igual
+        }
+        return data;
+      },
       builder: (context, data, reload) {
         final activos = asList(data['activos']);
         final disponibles = asList(data['disponibles']);
@@ -50,9 +62,23 @@ class _RetosTabState extends State<RetosTab> {
           note = completados.isEmpty ? 'Aquí aparecerán los retos que completes.' : '¡Llevas ${completados.length} reto(s) completado(s)! Qué nivel.';
         }
 
+        final recibidos = asInt(data['_duelos_recibidos']);
+        final enCurso = asInt(data['_duelos_activos']);
         return PfList(
           onRefresh: reload,
           children: [
+            RowCard([
+              RowTile(
+                title: 'Duelos 1 vs 1',
+                sub: recibidos > 0
+                    ? 'Te retaron $recibidos ${recibidos == 1 ? 'vez' : 'veces'} · responde'
+                    : (enCurso > 0 ? '$enCurso en curso' : 'Reta a alguien de tu squad'),
+                left: const IconDisc('target', tone: 'orange'),
+                right: recibidos > 0 ? PfBadge('$recibidos', tone: 'gold') : null,
+                chevron: true,
+                onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const DuelosScreen())),
+              ),
+            ]),
             Segmented(
               labels: ['Activos (${activos.length})', 'Disponibles (${disponibles.length})', 'Completados (${completados.length})'],
               selected: _tab,
@@ -69,7 +95,10 @@ class _RetosTabState extends State<RetosTab> {
             else
               for (final r in lista) _card(context, r),
             const SizedBox(height: 4),
-            PfButton('Crear un reto nuevo', kind: BtnKind.secondary, icon: 'plus', onPressed: () => toast('Función disponible próximamente')),
+            PfButton('Crear un reto para mi squad', kind: BtnKind.secondary, icon: 'plus', onPressed: () async {
+              final ok = await Navigator.of(context).push<bool>(MaterialPageRoute<bool>(builder: (_) => const CrearRetoSquadScreen()));
+              if (ok == true && mounted) setState(() => _tab = 0);
+            }),
           ],
         );
       },
@@ -95,7 +124,9 @@ class _RetosTabState extends State<RetosTab> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(asStr(r['titulo']), style: Tx.body(size: 14, w: FontWeight.w700)),
-                    Text('${tipoRetoLabel(asStr(r['tipo']))} · meta ${asInt(r['meta'])} $unidad', style: Tx.body(size: 11.5, color: C.inkMute)),
+                    Text('${tipoRetoLabel(asStr(r['tipo']), deSquad: asBool(r['de_squad']))} · meta ${asInt(r['meta'])} $unidad', style: Tx.body(size: 11.5, color: C.inkMute)),
+                    if (asBool(r['de_squad']) && asStr(r['creador']).isNotEmpty)
+                      Text('Creado por ${r['creador'] == app.user['nombre'] ? 'ti' : asStr(r['creador'])}', style: Tx.body(size: 11, color: C.inkMute)),
                   ],
                 ),
               ),
@@ -146,6 +177,24 @@ class RetoDetalleScreen extends StatefulWidget {
 class _RetoDetalleScreenState extends State<RetoDetalleScreen> {
   bool _joining = false;
 
+  Future<void> _cancelar() async {
+    final ok = await confirmSheet(
+      context,
+      title: '¿Cancelar este reto?',
+      body: 'Dejará de aparecer para tu squad. Quienes ya lo completaron conservan su XP.',
+      action: 'Cancelar reto',
+    );
+    if (!ok) return;
+    try {
+      await app.api.delete('/api/social/challenges/${widget.retoId}');
+      toast('Reto cancelado', type: ToastType.success);
+      app.bump();
+      if (mounted) Navigator.of(context).pop();
+    } on ApiException catch (e) {
+      toast(e.message, type: ToastType.error);
+    }
+  }
+
   Future<void> _join() async {
     setState(() => _joining = true);
     try {
@@ -169,6 +218,7 @@ class _RetoDetalleScreenState extends State<RetoDetalleScreen> {
           final metrica = asStr(r['metrica']);
           final unidad = metricUnit(metrica);
           final esSquad = asStr(r['tipo']) == 'squad';
+          final deSquad = asBool(r['de_squad']);
           final participantes = asList(r['participantes']);
           final finalizado = asBool(r['finalizado']);
           final completado = asBool(r['completado']);
@@ -177,6 +227,7 @@ class _RetoDetalleScreenState extends State<RetoDetalleScreen> {
           String pose = 'entrenando';
           if (metrica == 'sesiones') pose = 'energizado';
           if (metrica == 'dias_activos') pose = 'calentando';
+          if (metrica == 'peso_maximo') pose = 'vamos';
 
           Widget action;
           if (completado) {
@@ -198,7 +249,7 @@ class _RetoDetalleScreenState extends State<RetoDetalleScreen> {
             Padding(
               padding: const EdgeInsets.only(top: 2, bottom: 14),
               child: Text(
-                '${tipoRetoLabel(asStr(r['tipo']))} · ${finalizado ? 'finalizado' : 'termina en ${asInt(r['dias_restantes'])} días'}',
+                '${tipoRetoLabel(asStr(r['tipo']), deSquad: deSquad)} · ${finalizado ? 'finalizado' : 'termina en ${asInt(r['dias_restantes'])} días'}',
                 style: Tx.body(size: 12.5, color: C.inkSoft),
               ),
             ),
@@ -245,6 +296,13 @@ class _RetoDetalleScreenState extends State<RetoDetalleScreen> {
               ),
             const SizedBox(height: 6),
             action,
+            if (asBool(r['puede_cancelar']) && !finalizado)
+              Center(
+                child: TextButton(
+                  onPressed: _cancelar,
+                  child: Text('Cancelar este reto', style: Tx.body(size: 12.5, w: FontWeight.w700, color: C.error)),
+                ),
+              ),
           ]);
         },
       ),

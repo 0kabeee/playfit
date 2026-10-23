@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import '../common.dart';
 import 'perfil.dart' show CuentaScreen;
+import 'soporte.dart' show SoporteBubble, SoporteInput;
 
-/// Panel del administrador (equipo de PlayFit): metricas agregadas, usuarios, retos oficiales y auditoria.
+/// Panel del administrador (equipo de PlayFit): metricas agregadas, usuarios, retos, soporte y auditoria.
 /// El admin NUNCA ve datos clinicos ni entrenamientos individuales.
 class AdminShell extends StatefulWidget {
   const AdminShell({super.key});
@@ -11,8 +14,8 @@ class AdminShell extends StatefulWidget {
 }
 
 class _AdminShellState extends State<AdminShell> {
-  static const List<String> _titles = ['Resumen', 'Usuarios', 'Retos', 'Auditoría'];
-  static const List<String> _icons = ['bar-chart-3', 'users', 'trophy', 'shield-check'];
+  static const List<String> _titles = ['Resumen', 'Usuarios', 'Retos', 'Soporte', 'Auditoría'];
+  static const List<String> _icons = ['bar-chart-3', 'users', 'trophy', 'message-circle', 'shield-check'];
   int _tab = 0;
 
   @override
@@ -33,7 +36,7 @@ class _AdminShellState extends State<AdminShell> {
             Expanded(
               child: IndexedStack(
                 index: _tab,
-                children: const [AdminResumenTab(), AdminUsuariosTab(), AdminRetosTab(), AdminAuditoriaTab()],
+                children: const [AdminResumenTab(), AdminUsuariosTab(), AdminRetosTab(), AdminSoporteTab(), AdminAuditoriaTab()],
               ),
             ),
           ],
@@ -54,7 +57,7 @@ class _AdminShellState extends State<AdminShell> {
                     children: [
                       AnimatedContainer(
                         duration: const Duration(milliseconds: 160),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                         decoration: BoxDecoration(color: _tab == i ? C.goldBg : Colors.transparent, borderRadius: BorderRadius.circular(999)),
                         child: LIcon(_icons[i], size: 21, color: _tab == i ? C.ink : C.inkMute),
                       ),
@@ -92,6 +95,9 @@ class AdminResumenTab extends StatelessWidget {
             MetricTile('Sesiones totales', '${asInt(m['sesiones_total'])}'),
             MetricTile('Squads', '${asInt(m['squads'])}'),
             MetricTile('Retos activos', '${asInt(m['retos_activos'])}'),
+            MetricTile('Retos de squads', '${asInt(m['retos_de_squad_activos'])}'),
+            MetricTile('Duelos en curso', '${asInt(m['duelos_activos'])}'),
+            MetricTile('Soporte pendiente', '${asInt(m['soporte_pendientes'])}'),
             MetricTile('Con 2FA', '${asInt(m['usuarios_con_2fa'])}'),
           ]),
           const SectionLabel('Sesiones por semana'),
@@ -434,7 +440,7 @@ class AdminRetosTab extends StatelessWidget {
                   for (final r in retos)
                     RowTile(
                       title: asStr(r['titulo']),
-                      sub: 'Meta ${asInt(r['meta'])} ${metricUnit(asStr(r['metrica']))} · ${asInt(r['participantes'])} participan · ${asInt(r['completados'])} completaron',
+                      sub: '${r['squad'] == null ? 'Oficial' : 'Squad ${asStr(r['squad'])}'} · meta ${asInt(r['meta'])} ${metricUnit(asStr(r['metrica']))} · ${asInt(r['participantes'])} participan · ${asInt(r['completados'])} completaron',
                       left: IconDisc(metricIcon(asStr(r['metrica'])), tone: metricTone(asStr(r['metrica']))),
                       right: PfBadge(asBool(r['activo']) ? 'Activo' : 'Inactivo', tone: asBool(r['activo']) ? 'green' : 'grey'),
                       last: r == retos.last,
@@ -445,6 +451,200 @@ class AdminRetosTab extends StatelessWidget {
             ),
         ]);
       },
+    );
+  }
+}
+
+// ====================================================================== SOPORTE (bandeja)
+/// Solo llegan las conversaciones transferidas a un humano (pagos, Premium o cuando el usuario lo pide).
+/// Las que siguen con el asistente automatico son privadas del usuario.
+class AdminSoporteTab extends StatefulWidget {
+  const AdminSoporteTab({super.key});
+
+  @override
+  State<AdminSoporteTab> createState() => _AdminSoporteTabState();
+}
+
+class _AdminSoporteTabState extends State<AdminSoporteTab> {
+  int _filtro = 0; // 0 abiertas, 1 cerradas
+
+  String _estado(String e) => e == 'pendiente' ? 'Sin responder' : (e == 'atendiendo' ? 'En atención' : 'Cerrada');
+  String _tone(String e) => e == 'pendiente' ? 'orange' : (e == 'atendiendo' ? 'blue' : 'grey');
+
+  @override
+  Widget build(BuildContext context) {
+    return LoadView<Map<String, dynamic>>(
+      key: ValueKey<int>(_filtro),
+      loader: () async => asMap(await app.api.get('/api/social/admin/support', query: {'estado': _filtro == 0 ? 'abiertas' : 'cerrada'})),
+      builder: (context, d, reload) {
+        final convs = asList(d['conversaciones']);
+        return PfList(onRefresh: reload, children: [
+          Segmented(
+            labels: ['Abiertas${asInt(d['pendientes']) > 0 ? ' (${asInt(d['pendientes'])} nuevas)' : ''}', 'Cerradas'],
+            selected: _filtro,
+            onChanged: (i) => setState(() => _filtro = i),
+          ),
+          const PanelNote('Aquí llegan los chats que el asistente transfiere a un humano: pagos, Premium o cuando el usuario pide una persona. Cada conversación que abres queda en la auditoría.', icon: 'shield-check'),
+          if (convs.isEmpty)
+            Text(_filtro == 0 ? 'No hay conversaciones abiertas. ¡Todo al día!' : 'Aún no hay conversaciones cerradas.', style: Tx.body(size: 13, color: C.inkSoft))
+          else
+            PfCard(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+              child: Column(
+                children: [
+                  for (final c in convs)
+                    RowTile(
+                      title: '${asStr(c['nombre'])} ${asStr(c['apellido'])}',
+                      sub: '${asStr(c['motivo']) == 'pago' ? 'Pago · ' : ''}${asStr(c['ultimo_mensaje'])}',
+                      left: Avatar(Fmt.initials(asStr(c['nombre']), asStr(c['apellido'])), size: 38),
+                      right: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          PfBadge(asInt(c['no_leidos_admin']) > 0 ? '${asInt(c['no_leidos_admin'])} nuevos' : _estado(asStr(c['estado'])), tone: asInt(c['no_leidos_admin']) > 0 ? 'gold' : _tone(asStr(c['estado']))),
+                          const SizedBox(height: 4),
+                          Text(Fmt.relative(asStr(c['ultimo_mensaje_at'])), style: Tx.body(size: 10.5, color: C.inkMute)),
+                        ],
+                      ),
+                      last: c == convs.last,
+                      onTap: () async {
+                        await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => AdminSoporteChatScreen(conversacionId: asInt(c['id']))));
+                        app.bump();
+                      },
+                    ),
+                ],
+              ),
+            ),
+        ]);
+      },
+    );
+  }
+}
+
+class AdminSoporteChatScreen extends StatefulWidget {
+  final int conversacionId;
+  const AdminSoporteChatScreen({super.key, required this.conversacionId});
+
+  @override
+  State<AdminSoporteChatScreen> createState() => _AdminSoporteChatScreenState();
+}
+
+class _AdminSoporteChatScreenState extends State<AdminSoporteChatScreen> {
+  Map<String, dynamic>? _conv;
+  Object? _error;
+  bool _sending = false;
+  Timer? _poll;
+  final _input = TextEditingController();
+  final _scroll = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+    _poll = Timer.periodic(const Duration(seconds: 8), (_) {
+      if (asStr(_conv?['estado']) != 'cerrada') _load(silent: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    _input.dispose();
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  List<Map<String, dynamic>> get _mensajes => asList(_conv?['mensajes']);
+
+  Future<void> _load({bool silent = false}) async {
+    try {
+      final d = asMap(await app.api.get('/api/social/admin/support/${widget.conversacionId}'));
+      if (!mounted) return;
+      final antes = _mensajes.length;
+      setState(() {
+        _conv = d;
+        _error = null;
+      });
+      if (_mensajes.length != antes) _scrollDown();
+    } catch (e) {
+      if (!mounted || silent) return;
+      setState(() => _error = e);
+    }
+  }
+
+  void _scrollDown() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scroll.hasClients) {
+        _scroll.animateTo(_scroll.position.maxScrollExtent + 120, duration: const Duration(milliseconds: 220), curve: Curves.easeOut);
+      }
+    });
+  }
+
+  Future<void> _send() async {
+    final t = _input.text.trim();
+    if (t.isEmpty || _sending) return;
+    setState(() => _sending = true);
+    try {
+      final d = asMap(await app.api.post('/api/social/admin/support/${widget.conversacionId}/messages', body: {'mensaje': t}));
+      if (!mounted) return;
+      _input.clear();
+      setState(() => _conv = d);
+      _scrollDown();
+    } on ApiException catch (e) {
+      toast(e.message, type: ToastType.error);
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  Future<void> _cerrar() async {
+    final ok = await confirmSheet(context, title: '¿Cerrar la conversación?', body: 'El usuario verá que fue cerrada. Si escribe de nuevo se abre otra.', action: 'Cerrar', danger: false);
+    if (!ok) return;
+    try {
+      await app.api.post('/api/social/admin/support/${widget.conversacionId}/close');
+      toast('Conversación cerrada', type: ToastType.success);
+      if (mounted) Navigator.of(context).pop();
+    } on ApiException catch (e) {
+      toast(e.message, type: ToastType.error);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final u = asMap(_conv?['usuario']);
+    final cerrada = asStr(_conv?['estado']) == 'cerrada';
+    Widget body;
+    if (_conv == null && _error != null) {
+      body = ErrorState(error: _error!, onRetry: _load);
+    } else if (_conv == null) {
+      body = const SkeletonScreen();
+    } else {
+      body = Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            child: PanelNote(
+              '${asStr(u['email'])}${asStr(_conv?['motivo']) == 'pago' ? ' · motivo: pago' : ''}',
+              icon: 'circle-user',
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              controller: _scroll,
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              children: [for (final m in _mensajes) SoporteBubble(m, mia: asStr(m['autor']) == 'admin')],
+            ),
+          ),
+          if (cerrada)
+            const Padding(padding: EdgeInsets.all(16), child: PanelNote('Esta conversación está cerrada.', icon: 'check-circle'))
+          else
+            SoporteInput(controller: _input, sending: _sending, onSend: _send, hint: 'Responde al usuario…'),
+        ],
+      );
+    }
+    return PfScaffold(
+      title: _conv == null ? 'Soporte' : '${asStr(u['nombre'])} ${asStr(u['apellido'])}',
+      actions: _conv != null && !cerrada ? [PfIconButton('check-circle', onTap: _cerrar)] : const [],
+      body: body,
     );
   }
 }

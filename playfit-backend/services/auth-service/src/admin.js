@@ -39,6 +39,9 @@ async function metricas(actor) {
     retencion_7d: base ? Math.round((vuelven / base) * 100) : null,
     squads: await n('SELECT COUNT(*) AS n FROM squads'),
     retos_activos: await n('SELECT COUNT(*) AS n FROM retos WHERE activo=1 AND fecha_fin >= CURDATE()'),
+    retos_de_squad_activos: await n('SELECT COUNT(*) AS n FROM retos WHERE activo=1 AND squad_id IS NOT NULL AND fecha_fin >= CURDATE()'),
+    duelos_activos: await n("SELECT COUNT(*) AS n FROM duelos WHERE estado='activo'"),
+    soporte_pendientes: await n("SELECT COUNT(*) AS n FROM soporte_conversaciones WHERE estado='pendiente'"),
     usuarios_con_2fa: await n('SELECT COUNT(*) AS n FROM usuarios WHERE totp_activo=1')
   };
 }

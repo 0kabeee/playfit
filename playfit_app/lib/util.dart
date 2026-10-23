@@ -107,15 +107,30 @@ class Fmt {
   }
 }
 
-// ---- retos: unidad, icono y color segun la metrica ----
+// ---- retos y duelos: unidad, icono y color segun la metrica ----
 String metricUnit(String metrica) {
   switch (metrica) {
     case 'reps':
       return 'repeticiones';
     case 'sesiones':
       return 'sesiones';
+    case 'peso_maximo':
+      return 'kg';
     default:
       return 'días activos';
+  }
+}
+
+String metricLabel(String metrica) {
+  switch (metrica) {
+    case 'reps':
+      return 'Repeticiones';
+    case 'sesiones':
+      return 'Sesiones';
+    case 'peso_maximo':
+      return 'Peso máximo';
+    default:
+      return 'Días activos';
   }
 }
 
@@ -125,6 +140,8 @@ String metricIcon(String metrica) {
       return 'dumbbell';
     case 'sesiones':
       return 'flame';
+    case 'peso_maximo':
+      return 'target';
     default:
       return 'trophy';
   }
@@ -136,12 +153,15 @@ String metricTone(String metrica) {
       return 'blue';
     case 'sesiones':
       return 'orange';
+    case 'peso_maximo':
+      return 'green';
     default:
       return 'purple';
   }
 }
 
-String tipoRetoLabel(String tipo) {
+String tipoRetoLabel(String tipo, {bool deSquad = false}) {
+  if (deSquad) return tipo == 'squad' ? 'Reto del squad · meta entre todos' : 'Reto del squad · cada uno';
   switch (tipo) {
     case 'squad':
       return 'Reto de squad';
@@ -149,6 +169,9 @@ String tipoRetoLabel(String tipo) {
       return 'Reto individual';
   }
 }
+
+/// XP que da un reto creado en el squad (la fija el servidor: 50 + 10 por dia, maximo 300). Solo para mostrarla antes de crear.
+int xpRetoSquad(int dias) => (50 + 10 * dias).clamp(0, 300).toInt();
 
 /// Color del anillo del avatar segun la racha: dorado (10+), verde (5+), gris.
 String? ringForStreak(int racha) => racha >= 10 ? 'gold' : (racha >= 5 ? 'green' : 'grey');

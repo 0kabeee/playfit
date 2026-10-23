@@ -20,6 +20,24 @@ function createApp() {
     r.post('/challenges', ah(async (req, res) => res.status(201).json(await soc.crearReto(req.actor, body(req)))));
     r.get('/challenges/:id', ah(async (req, res) => res.json(await soc.detalleReto(req.actor, intParam(req.params.id)))));
     r.post('/challenges/:id/join', ah(async (req, res) => res.json(await soc.unirseReto(req.actor, intParam(req.params.id)))));
+    // retos creados por los miembros dentro de su squad
+    r.post('/squads/me/challenges', ah(async (req, res) => res.status(201).json(await soc.crearRetoSquad(req.actor, body(req)))));
+    r.delete('/challenges/:id', ah(async (req, res) => { await soc.cancelarRetoSquad(req.actor, intParam(req.params.id)); res.status(204).end(); }));
+
+    // duelos 1 vs 1 dentro del squad
+    r.get('/duels', ah(async (req, res) => res.json(await soc.listarDuelos(req.actor))));
+    r.post('/duels', ah(async (req, res) => res.status(201).json(await soc.crearDuelo(req.actor, body(req)))));
+    r.post('/duels/:id/respond', ah(async (req, res) => res.json(await soc.responderDuelo(req.actor, intParam(req.params.id), body(req).aceptar))));
+    r.post('/duels/:id/cancel', ah(async (req, res) => { await soc.cancelarDuelo(req.actor, intParam(req.params.id)); res.status(204).end(); }));
+
+    // soporte (usuario) y bandeja de soporte (admin)
+    r.get('/support', ah(async (req, res) => res.json(await soc.miSoporte(req.actor))));
+    r.post('/support/messages', ah(async (req, res) => res.status(201).json(await soc.enviarMensajeUsuario(req.actor, body(req).mensaje))));
+    r.post('/support/close', ah(async (req, res) => { await soc.cerrarMiSoporte(req.actor); res.status(204).end(); }));
+    r.get('/admin/support', ah(async (req, res) => res.json(await soc.bandeja(req.actor, { estado: req.query.estado || 'abiertas' }))));
+    r.get('/admin/support/:id', ah(async (req, res) => res.json(await soc.verConversacionAdmin(req.actor, intParam(req.params.id), { ip: req.ip }))));
+    r.post('/admin/support/:id/messages', ah(async (req, res) => res.status(201).json(await soc.responderAdmin(req.actor, intParam(req.params.id), body(req).mensaje, { ip: req.ip }))));
+    r.post('/admin/support/:id/close', ah(async (req, res) => { await soc.cerrarAdmin(req.actor, intParam(req.params.id), { ip: req.ip }); res.status(204).end(); }));
 
     // administracion de retos oficiales (solo admin: el servicio lo valida por permiso)
     r.get('/admin/challenges', ah(async (req, res) => res.json(await soc.listarRetosAdmin(req.actor))));

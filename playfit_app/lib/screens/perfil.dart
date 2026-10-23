@@ -2,6 +2,7 @@ import '../common.dart';
 import 'ranking.dart';
 import 'security_screens.dart';
 import 'sesiones.dart';
+import 'soporte.dart';
 
 // ====================================================================== PESTAÑA PERFIL
 class PerfilTab extends StatelessWidget {
@@ -101,6 +102,16 @@ class PerfilTab extends StatelessWidget {
                 left: const IconDisc('bar-chart-3', tone: 'purple'),
                 chevron: true,
                 onTap: () => _push(context, const RankingScreen()),
+              ),
+            ]),
+            const SectionLabel('Ayuda'),
+            RowCard([
+              RowTile(
+                title: 'Ayuda y soporte',
+                sub: 'Dudas, pagos y Premium · te atiende una persona si lo necesitas',
+                left: const IconDisc('message-circle', tone: 'blue'),
+                chevron: true,
+                onTap: () => _push(context, const SoporteScreen()),
               ),
             ]),
             const SectionLabel('Mi salud'),

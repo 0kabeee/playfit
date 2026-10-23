@@ -1,9 +1,8 @@
-// Aplica las migraciones idempotentes (03_fase7 y 04_fase11) sobre una base ya existente.
+// Aplica las migraciones idempotentes (03_fase7, 04_fase11 y 05_fase12) sobre una base ya existente.
 const fs = require('fs');
 const path = require('path');
-const db = require('./db');
 
-const ARCHIVOS = ['03_fase7.sql', '04_fase11.sql'];
+const ARCHIVOS = ['03_fase7.sql', '04_fase11.sql', '05_fase12.sql'];
 
 // Parte un archivo .sql en sentencias (los archivos de migracion no tienen ';' dentro de textos).
 function sentencias(texto) {
@@ -13,7 +12,7 @@ function sentencias(texto) {
 async function aplicar() {
   for (const a of ARCHIVOS) {
     const sql = fs.readFileSync(path.join(__dirname, '..', '..', 'database', a), 'utf8');
-    for (const s of sentencias(sql)) await db.sequelize.query(s);
+    for (const s of sentencias(sql)) await require('./db').sequelize.query(s);
   }
 }
 module.exports = { aplicar, sentencias, ARCHIVOS };

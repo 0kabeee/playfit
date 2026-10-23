@@ -217,12 +217,18 @@ async function eliminarCuenta(actor, password, { ip } = {}) {
         `SELECT sm.estudiante_id FROM squad_miembros sm LEFT JOIN perfil_gamificacion g ON g.estudiante_id=sm.estudiante_id
          WHERE sm.squad_id=:s AND sm.estudiante_id<>:e ORDER BY COALESCE(g.xp_total,0) DESC, sm.unido_at ASC`, { s: sm.squad_id, e: actor.id }, t);
       await run('DELETE FROM squad_miembros WHERE estudiante_id=:e', { e: actor.id }, t);
-      if (!otros.length) await run('DELETE FROM squads WHERE id=:s', { s: sm.squad_id }, t);
-      else if (sm.rol === 'lider') {
+      if (!otros.length) {
+        await run('DELETE FROM retos WHERE squad_id=:s', { s: sm.squad_id }, t);
+        await run('DELETE FROM squads WHERE id=:s', { s: sm.squad_id }, t);
+      } else if (sm.rol === 'lider') {
         await run('UPDATE squads SET lider_id=:l WHERE id=:s', { l: otros[0].estudiante_id, s: sm.squad_id }, t);
         await run("UPDATE squad_miembros SET rol='lider' WHERE squad_id=:s AND estudiante_id=:l", { s: sm.squad_id, l: otros[0].estudiante_id }, t);
       }
     }
+    // retos que creo dentro de un squad: pasan al lider actual de ese squad (si no queda nadie, se borran)
+    await run(`UPDATE retos r JOIN squads s ON s.id=r.squad_id SET r.creado_por=s.lider_id
+               WHERE r.creado_por=:e AND s.lider_id<>:e`, { e: actor.id }, t);
+    await run('DELETE FROM retos WHERE creado_por=:e', { e: actor.id }, t);
     await audit.registrar(actor, 'eliminar', 'usuario', actor.id, { ip, t }); // el usuario_id queda en NULL al borrarse la cuenta
     await run('DELETE FROM usuarios WHERE id=:e', { e: actor.id }, t);
   });

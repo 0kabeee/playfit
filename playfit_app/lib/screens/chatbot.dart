@@ -1,11 +1,13 @@
 import '../common.dart';
+import 'soporte.dart';
 
 class _Msg {
   final bool user;
   final String text;
   final bool alert; // aviso de salud
   final bool error;
-  const _Msg({required this.user, required this.text, this.alert = false, this.error = false});
+  final bool soporte; // la conversacion se transfirio a un humano (pagos)
+  const _Msg({required this.user, required this.text, this.alert = false, this.error = false, this.soporte = false});
 }
 
 /// Chat con el asistente (Gemini). Al modelo solo llegan indicadores generales, nunca el historial clinico.
@@ -179,7 +181,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       setState(() {
         _convId = asInt(r['conversacion_id']);
         _remaining = asInt(r['restantes_hoy']);
-        _messages.add(_Msg(user: false, text: asStr(r['respuesta']), alert: asBool(r['alerta_salud'])));
+        _messages.add(_Msg(user: false, text: asStr(r['respuesta']), alert: asBool(r['alerta_salud']), soporte: asBool(r['transferido_a_soporte'])));
       });
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -322,7 +324,18 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                   bottomRight: Radius.circular(18),
                 ),
               ),
-              child: Text(m.text, style: Tx.body(size: 13.5, height: 1.45)),
+              child: m.soporte
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(m.text, style: Tx.body(size: 13.5, height: 1.45)),
+                        const SizedBox(height: 10),
+                        PfButton('Ir a Soporte', kind: BtnKind.gold, small: true, expand: false, icon: 'message-circle', onPressed: () {
+                          Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const SoporteScreen()));
+                        }),
+                      ],
+                    )
+                  : Text(m.text, style: Tx.body(size: 13.5, height: 1.45)),
             ),
           ),
         ],

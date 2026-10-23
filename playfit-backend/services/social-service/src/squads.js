@@ -55,9 +55,13 @@ async function salirSquad(actor) {
     const otros = await select(
       `SELECT sm.estudiante_id, COALESCE(g.xp_total,0) AS xp FROM squad_miembros sm LEFT JOIN perfil_gamificacion g ON g.estudiante_id=sm.estudiante_id
        WHERE sm.squad_id=:s AND sm.estudiante_id<>:e ORDER BY xp DESC, sm.unido_at ASC`, { s: sq.squad_id, e: actor.id }, t);
+    // los retos creados dentro del squad se quedan con el squad: se borran mis participaciones sin terminar
+    await run(`DELETE rp FROM reto_participaciones rp JOIN retos r ON r.id=rp.reto_id
+               WHERE rp.estudiante_id=:e AND r.squad_id=:s AND rp.completado_at IS NULL`, { e: actor.id, s: sq.squad_id }, t);
     await run('UPDATE reto_participaciones SET squad_id=NULL WHERE estudiante_id=:e', { e: actor.id }, t);
     await run('DELETE FROM squad_miembros WHERE estudiante_id=:e', { e: actor.id }, t);
     if (!otros.length) {
+      await run('DELETE FROM retos WHERE squad_id=:s', { s: sq.squad_id }, t);
       await run('DELETE FROM squads WHERE id=:s', { s: sq.squad_id }, t);
       return { salio: true, squad_disuelto: true, nuevo_lider_id: null };
     }
