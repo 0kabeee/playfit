@@ -8,3 +8,4 @@ resources:
   - backend.yaml
   - networkpolicies.yaml
   - backup.yaml
+  - n8n.yaml

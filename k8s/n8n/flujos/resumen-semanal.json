@@ -1,0 +1,155 @@
+{
+  "name": "PlayFit - Resumen semanal del squad (domingo 6 p. m.)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 18 * * 0"
+            }
+          ]
+        }
+      },
+      "id": "92f03dd5-c075-4398-a76d-144c8dc43171",
+      "name": "Domingos 6 p. m.",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.PLAYFIT_API_URL }}/resumen-semanal",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-playfit-token",
+              "value": "={{ $env.PLAYFIT_N8N_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "87a9b05a-4e4f-4932-9aab-1c248bd42eaf",
+      "name": "Resumen de la semana",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Un aviso por squad con los numeros de la semana. Cada item termina en una llamada a /notificaciones.\nconst { squads } = $input.first().json;\nreturn squads.map((s) => {\n  const cuerpo = s.sesiones === 0\n    ? 'Esta semana nadie entreno. Propongan un reto para arrancar la proxima.'\n    : `${s.activos} de ${s.miembros} entrenaron: ${s.sesiones} sesiones y ${s.reps} repeticiones. ${s.retos_vigentes ? 'Tienen ' + s.retos_vigentes + ' reto(s) en curso.' : 'Creen un reto para la proxima semana.'}`;\n  return { json: { usuario_ids: s.usuario_ids, tipo: 'resumen_semanal', titulo: `Semana de ${s.nombre}`.slice(0, 100), cuerpo: cuerpo.slice(0, 255) }, pairedItem: 0 };\n});"
+      },
+      "id": "7da10376-5340-4665-88ec-639b79af8e08",
+      "name": "Un mensaje por squad",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PLAYFIT_API_URL }}/notificaciones",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-playfit-token",
+              "value": "={{ $env.PLAYFIT_N8N_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "0b6ece46-20fb-4e3b-aa29-cba2ff0cb555",
+      "name": "Crear notificaciones",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "4f2d9c1e-8a73-4b5e-9f10-6c2a7d3e5b02",
+      "name": "Ejecutar ahora",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        180
+      ]
+    }
+  ],
+  "connections": {
+    "Domingos 6 p. m.": {
+      "main": [
+        [
+          {
+            "node": "Resumen de la semana",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resumen de la semana": {
+      "main": [
+        [
+          {
+            "node": "Un mensaje por squad",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Un mensaje por squad": {
+      "main": [
+        [
+          {
+            "node": "Crear notificaciones",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ejecutar ahora": {
+      "main": [
+        [
+          {
+            "node": "Resumen de la semana",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Bogota"
+  },
+  "active": false,
+  "versionId": "c3a1e0d2-0b7e-4f0a-9d61-2a6b7f1e0102"
+}

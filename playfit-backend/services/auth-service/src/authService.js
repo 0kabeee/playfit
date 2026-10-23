@@ -174,6 +174,8 @@ async function registrarConsentimiento(actor, tipo, aceptado, { ip = null } = {}
   if (tipo === 'mayoria_edad' && !aceptado) throw E.badRequest('La declaracion de edad no se puede retirar; si ya no quieres usar PlayFit, elimina tu cuenta', 'DATOS_INVALIDOS');
   await insert('INSERT INTO consentimientos (usuario_id,tipo,aceptado,version_politica,texto_hash,ip) VALUES (:u,:t,:a,:v,:h,:ip)',
     { u: actor.id, t: tipo, a: aceptado ? 1 : 0, v: textos.VERSION, h: textos.porTipo[tipo].hash, ip: ip ? String(ip).slice(0, 45) : null });
+  // Al retirar el permiso del asistente se borra lo que el agente recordaba (Fase 13)
+  if (tipo === 'ia_chatbot' && !aceptado) await run('DELETE FROM ia_memoria WHERE estudiante_id=:u', { u: actor.id });
 }
 // El ultimo registro manda: si lo revoco, deja de valer.
 async function tieneConsentimiento(usuarioId, tipo) {

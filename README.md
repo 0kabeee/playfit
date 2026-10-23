@@ -8,7 +8,9 @@ App móvil de **gamificación social** para que los estudiantes de la Universida
 - **Registro de sesiones** con repeticiones y peso propios por serie.
 - **Conteo automático de repeticiones con la cámara** (ML Kit, en el celular): sentadilla, zancadas, flexiones, press militar y curl de bíceps. El video no se guarda ni se envía.
 - **Técnica de cada ejercicio** con video dentro de la app y consejos.
-- **Asistente de IA** (Gemini, plan gratuito) para dudas de técnica y nutrición. Solo recibe indicadores derivados, nunca texto clínico ni datos personales.
+- **Asistente de IA** (Gemini, plan gratuito) que funciona como **agente**: responde dudas, propone registrar tus entrenos o crear retos del squad (siempre con tu confirmación), recuerda tus preferencias y se puede usar **por voz**. Solo recibe indicadores derivados, nunca texto clínico ni datos personales.
+- **Notificaciones push** (Firebase Cloud Messaging) y **automatizaciones con n8n** (racha en riesgo, resumen semanal del squad, aviso al admin cuando un usuario pide una persona).
+- **Chat de soporte** con transferencia a un humano, **retos creados por el squad** y **duelos 1 vs 1**.
 - **Mascota contextual** que reacciona a tus datos reales (y no aparece en pantallas clínicas).
 - Seguridad: JWT con refresh rotativo, bloqueo temporal por intentos fallidos, historial clínico cifrado (AES-256-GCM) y auditoría de lecturas, alineado con la Ley 1581 y el Decreto 1377 de Colombia.
 
@@ -16,9 +18,9 @@ App móvil de **gamificación social** para que los estudiantes de la Universida
 
 | Carpeta | Contenido |
 |---|---|
-| [`playfit-backend/`](playfit-backend) | Node.js + MariaDB: API Gateway (puerto 3000) y 4 microservicios (auth, clinical, social, content). 97 pruebas automáticas. Imagen Docker + `docker-compose.yml`. |
-| [`playfit_app/`](playfit_app) | App Flutter (Android). Solo rol estudiante. |
-| [`k8s/`](k8s) | Despliegue en Kubernetes: Docker Desktop (local) y Azure AKS con HTTPS. Guía en `k8s/README.md`. |
+| [`playfit-backend/`](playfit-backend) | Node.js + MariaDB: API Gateway (puerto 3000) y 4 microservicios (auth, clinical, social, content). 143 pruebas automáticas. Imagen Docker + `docker-compose.yml`. |
+| [`playfit_app/`](playfit_app) | App Flutter (Android). Roles usuario y admin. 44 pruebas. |
+| [`k8s/`](k8s) | Despliegue en Kubernetes: Docker Desktop (local) y Azure AKS con HTTPS, más n8n (`k8s/n8n/`). Guía en `k8s/README.md`. |
 
 Cada carpeta tiene su propio `README.md` con los detalles.
 

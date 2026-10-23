@@ -1,0 +1,157 @@
+{
+  "name": "PlayFit - Aviso a los admins por transferencia a Soporte",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "soporte-transferida",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "6c95c3d6-1eaf-4dac-92f0-8aca57fc8237",
+      "name": "Evento del backend",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "33e0b5e9-b961-4584-810d-415ebf5b0455"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "95f8f44c-27cb-4f26-93e4-727547b1d3f8",
+              "leftValue": "={{ $json.headers['x-playfit-token'] }}",
+              "rightValue": "={{ $env.PLAYFIT_N8N_TOKEN }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8a4e2ddb-436f-4883-abbc-710f5c8275ee",
+      "name": "Token valido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Solo llegan ids y el motivo (nunca el texto del mensaje del usuario).\nconst { motivo } = $input.first().json.body;\nreturn [{ json: {\n  destino: 'admins',\n  tipo: 'soporte',\n  titulo: 'Nueva conversacion en Soporte',\n  cuerpo: motivo === 'pago' ? 'Un usuario necesita ayuda con pagos o Premium.' : 'Un usuario pidio hablar con una persona.'\n}, pairedItem: 0 }];"
+      },
+      "id": "fa0f3d37-526f-4f42-baf9-1754500aaf49",
+      "name": "Armar aviso",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PLAYFIT_API_URL }}/notificaciones",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-playfit-token",
+              "value": "={{ $env.PLAYFIT_N8N_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "e4cb5d54-3a41-4d19-8779-2c47548ed314",
+      "name": "Crear notificaciones",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "errorMessage": "Token invalido: el evento no viene del backend de PlayFit"
+      },
+      "id": "b1f0c6a2-6d3e-4c55-9a51-0f6c1d2e7a90",
+      "name": "Rechazar",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        440,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "Evento del backend": {
+      "main": [
+        [
+          {
+            "node": "Token valido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Token valido?": {
+      "main": [
+        [
+          {
+            "node": "Armar aviso",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rechazar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar aviso": {
+      "main": [
+        [
+          {
+            "node": "Crear notificaciones",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Bogota"
+  },
+  "active": false,
+  "versionId": "c3a1e0d2-0b7e-4f0a-9d61-2a6b7f1e0103"
+}

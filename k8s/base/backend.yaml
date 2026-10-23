@@ -278,6 +278,19 @@ spec:
                 secretKeyRef:
                   name: playfit-secrets
                   key: JWT_SECRET
+            # Fase 13: push con Firebase (opcional) y token de la API interna para n8n (opcional)
+            - name: FCM_SERVICE_ACCOUNT
+              valueFrom:
+                secretKeyRef:
+                  name: playfit-secrets
+                  key: FCM_SERVICE_ACCOUNT
+                  optional: true
+            - name: N8N_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: playfit-secrets
+                  key: N8N_TOKEN
+                  optional: true
           readinessProbe:
             httpGet: { path: /health, port: http }
             periodSeconds: 10
@@ -381,6 +394,13 @@ spec:
                 secretKeyRef:
                   name: playfit-secrets
                   key: GEMINI_API_KEY
+                  optional: true
+            # Fase 13: token para avisar eventos a n8n (opcional)
+            - name: N8N_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: playfit-secrets
+                  key: N8N_TOKEN
                   optional: true
           readinessProbe:
             httpGet: { path: /health, port: http }

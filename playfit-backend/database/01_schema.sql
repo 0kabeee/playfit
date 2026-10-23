@@ -7,7 +7,7 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
-DROP TABLE IF EXISTS intentos_login, codigos_verificacion, codigos_respaldo_2fa, soporte_mensajes, soporte_conversaciones, duelos;
+DROP TABLE IF EXISTS ia_acciones, ia_memoria, dispositivos_push, intentos_login, codigos_verificacion, codigos_respaldo_2fa, soporte_mensajes, soporte_conversaciones, duelos;
 DROP VIEW  IF EXISTS v_reps_semanales;
 DROP VIEW  IF EXISTS v_ranking_ejercicio;
 DROP VIEW  IF EXISTS v_ranking_xp;

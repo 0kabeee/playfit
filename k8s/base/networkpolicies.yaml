@@ -42,6 +42,37 @@ spec:
         - { protocol: TCP, port: 3003 }
         - { protocol: TCP, port: 3004 }
 ---
+# n8n (Fase 13) puede llamar SOLO al social-service (su API interna /internal, protegida ademas con N8N_TOKEN)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: social-desde-n8n
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: social }
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { playfit/tier: automatizacion } }
+      ports:
+        - { protocol: TCP, port: 3003 }
+---
+# n8n: solo lo llaman los microservicios (webhooks de eventos). El editor se abre con kubectl port-forward,
+# que entra por la API de Kubernetes y no necesita una regla aqui.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: n8n-solo-desde-servicios
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: n8n }
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { playfit/tier: service } }
+      ports:
+        - { protocol: TCP, port: 5678 }
+---
 # Gateway: en local se abre a todos; el overlay de Azure lo restringe a Caddy (HTTPS)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

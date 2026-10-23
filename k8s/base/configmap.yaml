@@ -27,3 +27,6 @@ data:
   CORS_ORIGINS: ""
   GEMINI_MODEL: gemini-3.1-flash-lite
   IA_LIMITE_DIARIO: "20"
+  # Fase 13: eventos hacia n8n (si el flujo no esta activo, el backend usa su respaldo) y envio de push cada 10 s
+  N8N_WEBHOOK_URL: http://n8n:5678/webhook
+  PUSH_INTERVALO_SEG: "10"

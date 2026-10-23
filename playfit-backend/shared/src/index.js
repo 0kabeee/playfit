@@ -6,6 +6,8 @@ module.exports = {
   rbac: require('./rbac'),
   audit: require('./audit'),
   soporte: require('./soporte'),
+  push: require('./push'),
+  eventos: require('./eventos'),
   dbReset: require('./dbReset'),
   env: require('./env'),
   http: require('./http')

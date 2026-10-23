@@ -34,6 +34,12 @@ function createApp({ llm = null } = {}) {
     r.post('/ai/chat', ah(async (req, res) => res.json(await ia.chat(req.actor, { conversacionId: body(req).conversacionId, mensaje: body(req).mensaje }, { llm }))));
     r.get('/ai/conversations', ah(async (req, res) => res.json(await ia.listarConversaciones(req.actor))));
     r.get('/ai/conversations/:id', ah(async (req, res) => res.json(await ia.verConversacion(req.actor, intParam(req.params.id)))));
+    // propuestas del agente: la app avisa si el usuario las confirmo (y ya se ejecutaron) o las cancelo
+    r.post('/ai/actions/:id', ah(async (req, res) => res.json(await ia.resolverAccion(req.actor, intParam(req.params.id), body(req)))));
+    // memoria del agente: el usuario ve lo que recuerda y lo borra cuando quiera
+    r.get('/ai/memory', ah(async (req, res) => res.json(await ia.verMemoria(req.actor))));
+    r.delete('/ai/memory', ah(async (req, res) => { await ia.borrarMemoria(req.actor); res.status(204).end(); }));
+    r.delete('/ai/memory/:clave', ah(async (req, res) => { await ia.borrarMemoria(req.actor, String(req.params.clave)); res.status(204).end(); }));
 
     app.use('/api/content', r);
   });

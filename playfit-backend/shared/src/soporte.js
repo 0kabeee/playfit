@@ -54,6 +54,7 @@ async function marcarTransferida(convId, motivo, t) {
 }
 
 // Usado por el asistente de IA: el mensaje del usuario y el aviso de transferencia quedan en Soporte.
+// `transferida` = true solo si la conversacion recien paso a la bandeja (para avisar a los admins una sola vez).
 async function transferirDesdeIa(usuarioId, mensaje, motivo, t) {
   const conv = await obtenerOAbrir(usuarioId, t);
   await agregarMensaje(conv.id, 'usuario', usuarioId, mensaje, t);
@@ -61,7 +62,7 @@ async function transferirDesdeIa(usuarioId, mensaje, motivo, t) {
     await agregarMensaje(conv.id, 'bot', null, MSG_TRANSFERENCIA, t);
     await marcarTransferida(conv.id, motivo, t);
   }
-  return conv.id;
+  return { id: conv.id, transferida: conv.estado === 'bot' };
 }
 
 module.exports = {

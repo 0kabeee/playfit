@@ -1,7 +1,8 @@
 const express = require('express');
-const { http } = require('@playfit/shared');
+const { http, push } = require('@playfit/shared');
 const { E } = require('@playfit/shared');
 const soc = require('./index');
+const internal = require('./internal');
 const { asyncHandler: ah, authenticate, intParam, optInt, createServiceApp } = http;
 
 function createApp() {
@@ -46,6 +47,9 @@ function createApp() {
     // notificaciones, insignias y marcas personales
     r.get('/notifications', ah(async (req, res) => res.json(await soc.listarNotificaciones(req.actor))));
     r.post('/notifications/read', ah(async (req, res) => { await soc.marcarNotificacionesLeidas(req.actor); res.status(204).end(); }));
+    // celulares para notificaciones push (FCM): la app registra su token al entrar y lo quita al cerrar sesion
+    r.post('/devices', ah(async (req, res) => { await push.registrarDispositivo(req.actor.id, body(req).token); res.status(204).end(); }));
+    r.delete('/devices', ah(async (req, res) => { await push.quitarDispositivo(req.actor.id, body(req).token); res.status(204).end(); }));
     r.get('/badges', ah(async (req, res) => res.json(await soc.catalogoInsignias(req.actor))));
     r.get('/records', ah(async (req, res) => {
       const q = req.query.student;
@@ -68,6 +72,8 @@ function createApp() {
     r.get('/rankings/exercises/:id', ah(async (req, res) => res.json(await soc.rankingEjercicio(req.actor, intParam(req.params.id), { limite: req.query.limit }))));
 
     app.use('/api/social', r);
+    // API interna para n8n (no la expone el gateway; ver internal.js)
+    app.use('/internal', internal.router());
   });
 }
 module.exports = { createApp };

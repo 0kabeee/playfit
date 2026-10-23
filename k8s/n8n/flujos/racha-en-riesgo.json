@@ -1,0 +1,155 @@
+{
+  "name": "PlayFit - Racha en riesgo (diario 7 p. m.)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 19 * * *"
+            }
+          ]
+        }
+      },
+      "id": "5ad64341-1cc5-40fe-823a-fa1f2922db81",
+      "name": "Todos los dias 7 p. m.",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.PLAYFIT_API_URL }}/rachas-en-riesgo",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-playfit-token",
+              "value": "={{ $env.PLAYFIT_N8N_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "37b57feb-f2f1-4522-bd9d-00df33a98949",
+      "name": "Rachas en riesgo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Si nadie esta en riesgo, el flujo termina aqui (no se envia nada).\nconst datos = $input.first().json;\nif (!datos.usuario_ids || datos.usuario_ids.length === 0) return [];\nreturn [{ json: {\n  usuario_ids: datos.usuario_ids,\n  tipo: 'racha_riesgo',\n  titulo: 'Tu racha esta en riesgo',\n  cuerpo: 'Hoy todavia no entrenas. Una sesion corta basta para no perderla.'\n}, pairedItem: 0 }];"
+      },
+      "id": "dd03e875-1cf6-4d8a-9b23-741315f3c82c",
+      "name": "Armar aviso",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PLAYFIT_API_URL }}/notificaciones",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-playfit-token",
+              "value": "={{ $env.PLAYFIT_N8N_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "81435798-25cc-4e15-a9ec-4d711c8c14c8",
+      "name": "Crear notificaciones",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "4f2d9c1e-8a73-4b5e-9f10-6c2a7d3e5b01",
+      "name": "Ejecutar ahora",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        180
+      ]
+    }
+  ],
+  "connections": {
+    "Todos los dias 7 p. m.": {
+      "main": [
+        [
+          {
+            "node": "Rachas en riesgo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rachas en riesgo": {
+      "main": [
+        [
+          {
+            "node": "Armar aviso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar aviso": {
+      "main": [
+        [
+          {
+            "node": "Crear notificaciones",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ejecutar ahora": {
+      "main": [
+        [
+          {
+            "node": "Rachas en riesgo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Bogota"
+  },
+  "active": false,
+  "versionId": "c3a1e0d2-0b7e-4f0a-9d61-2a6b7f1e0101"
+}

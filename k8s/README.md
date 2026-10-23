@@ -13,7 +13,8 @@ Internet ──► IP pública de Azure + subdominio  NOMBRE.REGION.cloudapp.azu
               │
               ├─► auth (3001)       ┐
               ├─► clinical (3002)   │ solo el gateway puede llamarlos (NetworkPolicy)
-              ├─► social (3003)     │
+              ├─► social (3003) ◄───┼── n8n (5678, sin IP pública; API interna /internal)
+              │        └──────────────┼──► Firebase Cloud Messaging (push)
               └─► content (3004) ───┼──► Gemini (internet)
                                     ▼
                                  MariaDB 11.8 (SQL relacional, disco persistente de 5 GB)
@@ -23,7 +24,8 @@ Internet ──► IP pública de Azure + subdominio  NOMBRE.REGION.cloudapp.azu
 
 | Carpeta / archivo | Qué es |
 |---|---|
-| `base/` | Lo común: namespace, configuración, MariaDB, gateway + 4 servicios, NetworkPolicies, respaldos |
+| `base/` | Lo común: namespace, configuración, MariaDB, gateway + 4 servicios, NetworkPolicies, respaldos y n8n |
+| `n8n/` | Flujos de n8n listos para importar y su guía (Fase 13) |
 | `overlays/local/` | Para el Kubernetes de Docker Desktop: el gateway queda en `http://localhost:3000` |
 | `overlays/azure/` | Para AKS: Caddy con HTTPS, subdominio de Azure, imagen desde GitHub (ghcr.io) |
 | `generar-secretos.js` | Crea `overlays/ENTORNO/secrets.env` con contraseñas y llaves aleatorias (**nunca se sube a Git**) |
@@ -229,10 +231,54 @@ Borra el clúster, los discos y la IP. **Los datos se pierden** (saca un respald
 | Límites por IP con la IP real del cliente (no compartidos entre todos los usuarios) | `GATEWAY_TRUST_PROXY=1` |
 | Respaldos diarios; el historial clínico va cifrado (AES-256-GCM) también dentro del respaldo | `base/backup.yaml` |
 | Despliegue reproducible con Docker Compose y Kubernetes | RNF-15 |
+| n8n sin IP pública (editor solo por `kubectl port-forward`); solo puede llamar al social-service y su API interna exige `N8N_TOKEN`; solo crea notificaciones y solo recibe ids y números | `base/n8n.yaml`, `base/networkpolicies.yaml` |
+| Push: el backend firma con la cuenta de servicio de Firebase (secreto); la app solo tiene datos públicos de Firebase | `FCM_SERVICE_ACCOUNT` |
 
 ---
 
-## 5. Problemas comunes
+## 5. Fase 13: notificaciones push (Firebase) y n8n
+
+### 5.1 Secretos nuevos
+Desde `C:\playfit` corre otra vez el generador. Como tu `secrets.env` ya existe, **solo agrega** las claves que faltan (`N8N_TOKEN`, `N8N_ENCRYPTION_KEY`, `FCM_SERVICE_ACCOUNT`) y no toca las demás:
+```
+node k8s\generar-secretos.js azure
+node k8s\generar-secretos.js local
+```
+`N8N_ENCRYPTION_KEY` cifra las credenciales que guardes dentro de n8n: **guárdala con la copia segura de `secrets.env`**.
+
+### 5.2 Crear el proyecto de Firebase (gratis, una vez)
+1. Entra a https://console.firebase.google.com › *Agregar proyecto* (puedes desactivar Google Analytics).
+2. *Configuración del proyecto* › *General* › *Agregar app* › **Android**, paquete `co.edu.usb.playfit_app` (o el `applicationId` de `playfit_app/android/app/build.gradle.kts`). **No** hace falta descargar `google-services.json`.
+3. De esa misma página copia 4 datos **públicos** de la app: *Clave de API web* (`FCM_API_KEY`), *ID de la app* (`FCM_APP_ID`), *Número del proyecto* (`FCM_SENDER_ID`) e *ID del proyecto* (`FCM_PROJECT_ID`). Se le pasan a la app al compilar (desde `C:\playfit\playfit_app`, en una sola línea):
+   ```
+   flutter build apk --release --dart-define=API_BASE=https://playfit-usb.chilecentral.cloudapp.azure.com --dart-define=FCM_API_KEY=... --dart-define=FCM_APP_ID=... --dart-define=FCM_SENDER_ID=... --dart-define=FCM_PROJECT_ID=...
+   ```
+   Sin esos 4 datos la app funciona igual, pero no pide permiso de notificaciones ni recibe push. Antes de compilar corre una vez `node tools\patch_android.js` (agrega los permisos de micrófono y notificaciones).
+4. *Configuración del proyecto* › *Cuentas de servicio* › **Generar nueva clave privada**. Se descarga un `.json`: es **secreto** (no lo subas a Git ni lo pegues en el chat).
+5. Conviértelo a base64 en una sola línea (PowerShell):
+   ```
+   [Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\ruta\al\archivo.json")) | Set-Clipboard
+   ```
+   y pégalo después de `FCM_SERVICE_ACCOUNT=` en `k8s\overlays\azure\secrets.env` (y en `playfit-backend\.env` para probar en tu PC).
+
+### 5.3 Desplegar la versión 1.3.0
+```
+docker build -t ghcr.io/0kabeee/playfit-backend:1.3.0 playfit-backend
+docker push ghcr.io/0kabeee/playfit-backend:1.3.0
+```
+Cambia `newTag: "1.3.0"` en `k8s\overlays\azure\kustomization.yaml` y:
+```
+kubectl apply -k k8s\overlays\azure
+kubectl rollout status deployment -n playfit
+kubectl logs -n playfit deploy/auth -c db-init
+kubectl logs -n playfit deploy/social
+```
+El `db-init` debe aplicar `06_fase13.sql`. En el log de `social` debe salir `[push] notificaciones push activas (proyecto Firebase "...")`. n8n tarda ~1 minuto en quedar listo la primera vez (`kubectl get pods -n playfit`).
+
+### 5.4 Activar los flujos de n8n
+Sigue `k8s/n8n/README.md` (abrir el editor con `port-forward`, importar los 3 flujos y activarlos). Sin n8n la app funciona igual: lo único que se pierde son los avisos automáticos (racha y resumen semanal); el aviso a los admins por Soporte tiene respaldo.
+
+## 6. Problemas comunes
 
 | Síntoma | Qué revisar |
 |---|---|

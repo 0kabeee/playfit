@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/api_client.dart';
 import '../globals.dart';
+import '../services/push_service.dart';
 import '../util.dart';
 import '../widgets/toast.dart';
 
@@ -25,9 +26,16 @@ const List<String> kRolesApp = <String>['estudiante', 'admin'];
 class AppState extends ChangeNotifier {
   AppState() {
     api = ApiClient(onTokens: _persistTokens, onSessionLost: _sessionLost);
+    push = PushService(api, onForeground: (titulo, cuerpo) {
+      toast(cuerpo.isEmpty ? titulo : '$titulo · $cuerpo', icon: 'bell');
+      refreshUnread();
+    });
   }
 
   late final ApiClient api;
+
+  /// Notificaciones push (Fase 13). Sin configuracion de Firebase no hace nada.
+  late final PushService push;
   final FlutterSecureStorage _secure = const FlutterSecureStorage();
   SharedPreferences? _prefs;
 
@@ -103,7 +111,10 @@ class AppState extends ChangeNotifier {
     const minimo = Duration(milliseconds: 1100); // que el splash se alcance a ver
     if (elapsed < minimo) await Future.delayed(minimo - elapsed);
     _setStatus(next);
-    if (next == AuthStatus.loggedIn) syncPending();
+    if (next == AuthStatus.loggedIn) {
+      syncPending();
+      push.registrar();
+    }
   }
 
   void _loadLocalForUser() {
@@ -130,6 +141,7 @@ class AppState extends ChangeNotifier {
     _loadLocalForUser();
     _setStatus(AuthStatus.loggedIn);
     syncPending();
+    push.registrar();
   }
 
   /// Segundo paso del login: codigo de la app de autenticacion o codigo de respaldo.
@@ -200,6 +212,7 @@ class AppState extends ChangeNotifier {
       aviso = 'Cuenta creada, pero no pude guardar tu historial. Complétalo en Perfil › Historial clínico.';
     }
     _setStatus(AuthStatus.loggedIn);
+    push.registrar();
     if (aviso != null) toast(aviso);
   }
 
@@ -221,6 +234,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    await push.quitar(); // antes de cerrar la sesion: este celular deja de recibir tus avisos
     final rt = api.refreshToken;
     if (rt != null) {
       try {

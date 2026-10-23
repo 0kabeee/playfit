@@ -118,6 +118,22 @@ const Map<String, String> kLucide = {
   <path d="m2 2 20 20" />''',
   'x': r'''<path d="M18 6 6 18" />
   <path d="m6 6 12 12" />''',
+  // Fase 13 (voz y memoria del asistente): agregados a mano desde lucide.dev
+  'mic': r'''<path d="M12 19v3" />
+  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+  <rect x="9" y="2" width="6" height="13" rx="3" />''',
+  'square': r'''<rect width="18" height="18" x="3" y="3" rx="2" />''',
+  'volume-2': r'''<path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" />
+  <path d="M16 9a5 5 0 0 1 0 6" />
+  <path d="M19.364 18.364a9 9 0 0 0 0-12.728" />''',
+  'volume-x': r'''<path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" />
+  <line x1="22" x2="16" y1="9" y2="15" />
+  <line x1="16" x2="22" y1="9" y2="15" />''',
+  'sparkles': r'''<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
+  <path d="M20 3v4" />
+  <path d="M22 5h-4" />
+  <path d="M4 17v2" />
+  <path d="M5 18H3" />''',
 };
 
 /// Icono Lucide (los mismos del mockup) dibujado como SVG con el color pedido.

@@ -2,7 +2,7 @@
 // Usuario: escribe en Soporte; mientras la conversacion esta con el bot recibe respuestas automaticas.
 //   Si menciona pagos/Premium (o pide una persona) -> "Un momento, ya te transfiero a un asistente humano" y pasa a la bandeja.
 // Admin: ve la bandeja (pendientes primero), responde, y cierra. Cada vez que un admin abre una conversacion queda en la auditoria.
-const { one, select, run, tx, E, rbac, audit, soporte: S } = require('@playfit/shared');
+const { one, select, run, tx, E, rbac, audit, eventos, soporte: S } = require('@playfit/shared');
 const H = require('./helpers');
 
 const MAX_MENSAJE = 1000, MAX_POR_HORA = 30;
@@ -39,17 +39,19 @@ async function enviarMensajeUsuario(actor, mensaje) {
   const res = await tx(async (t) => {
     const c = await S.obtenerOAbrir(actor.id, t);
     await S.agregarMensaje(c.id, 'usuario', actor.id, texto, t);
-    let transferida = false;
+    let transferida = false, motivo = null;
     if (c.estado === 'bot') {
       const pago = S.detectarPago(texto);
       if (pago || S.detectarHumano(texto)) {
+        motivo = pago ? 'pago' : 'general';
         await S.agregarMensaje(c.id, 'bot', null, S.MSG_TRANSFERENCIA, t);
-        await S.marcarTransferida(c.id, pago ? 'pago' : 'general', t);
+        await S.marcarTransferida(c.id, motivo, t);
         transferida = true;
       } else await S.agregarMensaje(c.id, 'bot', null, S.respuestaBot(texto), t);
     }
-    return { id: c.id, transferida };
+    return { id: c.id, transferida, motivo };
   });
+  if (res.transferida) await eventos.soporteTransferida(res.id, res.motivo); // aviso a los admins (n8n o respaldo)
   const c = await one('SELECT * FROM soporte_conversaciones WHERE id=:id', { id: res.id });
   await run('UPDATE soporte_conversaciones SET no_leidos_usuario=0 WHERE id=:id', { id: c.id });
   return { transferida: res.transferida, conversacion: await vistaUsuario(c) };
