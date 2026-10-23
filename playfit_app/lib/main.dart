@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'globals.dart';
+import 'screens/admin_screens.dart';
 import 'screens/auth_screens.dart';
 import 'screens/home_shell.dart';
 import 'state/app_state.dart';
@@ -45,7 +46,7 @@ class _RootGate extends StatelessWidget {
           case AuthStatus.expired:
             return const SessionExpiredScreen();
           case AuthStatus.loggedIn:
-            return const HomeShell();
+            return app.isAdmin ? const AdminShell() : const HomeShell();
         }
       },
     );

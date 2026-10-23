@@ -43,6 +43,9 @@ const contenido = [
   `CLINICAL_KEY=${crypto.randomBytes(32).toString('hex')}`,
   `DEMO_PASSWORD=${demo}`,
   `GEMINI_API_KEY=${gemini}`,
+  '# Correo con Brevo (recuperacion de contrasena). Crea una cuenta gratis en brevo.com, genera una clave API y verifica un remitente.',
+  'BREVO_API_KEY=',
+  'MAIL_FROM=',
   ''
 ].join('\n');
 fs.writeFileSync(destino, contenido, { mode: 0o600 });

@@ -21,7 +21,7 @@ configMapGenerator:
     files:
       - Caddyfile
     literals:
-      - PLAYFIT_DOMAIN=playfit-usb.eastus2.cloudapp.azure.com   # <-- CAMBIA (nombre + region que elijas)
+      - PLAYFIT_DOMAIN=playfit-usb.chilecentral.cloudapp.azure.com   # <-- CAMBIA (nombre + region que elijas)
 patches:
   # El gateway queda detras de Caddy: confia en 1 salto para ver la IP real del cliente (limites por IP)
   - target: { kind: ConfigMap, name: playfit-config }

@@ -21,6 +21,10 @@ function createApp() {
     r.get('/challenges/:id', ah(async (req, res) => res.json(await soc.detalleReto(req.actor, intParam(req.params.id)))));
     r.post('/challenges/:id/join', ah(async (req, res) => res.json(await soc.unirseReto(req.actor, intParam(req.params.id)))));
 
+    // administracion de retos oficiales (solo admin: el servicio lo valida por permiso)
+    r.get('/admin/challenges', ah(async (req, res) => res.json(await soc.listarRetosAdmin(req.actor))));
+    r.patch('/admin/challenges/:id', ah(async (req, res) => { await soc.cambiarEstadoReto(req.actor, intParam(req.params.id), body(req).activo); res.status(204).end(); }));
+
     // notificaciones, insignias y marcas personales
     r.get('/notifications', ah(async (req, res) => res.json(await soc.listarNotificaciones(req.actor))));
     r.post('/notifications/read', ah(async (req, res) => { await soc.marcarNotificacionesLeidas(req.actor); res.status(204).end(); }));

@@ -14,7 +14,6 @@ function createApp() {
     r.put('/students/:id/history', ah(async (req, res) => res.json(await clin.guardarHistorial(req.actor, idOrMe(req), body(req), { ip: req.ip }))));
 
     r.get('/students/:id/flags', ah(async (req, res) => res.json(await clin.obtenerFlags(req.actor, idOrMe(req), { ip: req.ip }))));
-    r.put('/students/:id/flags', ah(async (req, res) => res.json(await clin.fijarFlagsDocente(req.actor, idOrMe(req), body(req).codigos, { ip: req.ip }))));
 
     r.get('/students/:id/measurements', ah(async (req, res) => res.json(await clin.listarMediciones(req.actor, idOrMe(req), { ip: req.ip }))));
     r.post('/students/:id/measurements', ah(async (req, res) => res.status(201).json(await clin.registrarMedicion(req.actor, idOrMe(req), body(req)))));

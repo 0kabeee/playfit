@@ -12,6 +12,15 @@ import '../widgets/toast.dart';
 
 enum AuthStatus { unknown, loggedOut, loggedIn, expired }
 
+/// Resultado del primer paso de login: 'ok' (ya entro), 'code' (pide el codigo 2FA) o 'setup' (admin debe configurar 2FA).
+class LoginOutcome {
+  const LoginOutcome(this.step, [this.desafio = '']);
+  final String step;
+  final String desafio;
+}
+
+const List<String> kRolesApp = <String>['estudiante', 'admin'];
+
 /// Estado global de la app: sesion, usuario, avisos y cola de sesiones sin conexion.
 class AppState extends ChangeNotifier {
   AppState() {
@@ -35,6 +44,7 @@ class AppState extends ChangeNotifier {
   List<Map<String, dynamic>> pending = <Map<String, dynamic>>[];
   bool _syncing = false;
 
+  bool get isAdmin => asStr(user['rol']) == 'admin';
   int get userId => asInt(user['id']);
   String get firstName => asStr(user['nombre']);
   String get fullName => '${asStr(user['nombre'])} ${asStr(user['apellido'])}'.trim();
@@ -67,7 +77,7 @@ class AppState extends ChangeNotifier {
     if (refresh != null) {
       try {
         final me = asMap(await api.get('/api/auth/me'));
-        if (asStr(me['rol']) == 'estudiante') {
+        if (kRolesApp.contains(asStr(me['rol']))) {
           user = me;
           await _cacheUser();
           next = AuthStatus.loggedIn;
@@ -107,12 +117,54 @@ class AppState extends ChangeNotifier {
   }
 
   // ---------------------------------------------------------------- sesion
-  Future<void> login(String email, String password) async {
+  Future<LoginOutcome> login(String email, String password) async {
     final data = asMap(await api.post('/api/auth/login', body: {'email': email.trim(), 'password': password}, auth: false));
+    if (data['requiere_2fa'] == true) return LoginOutcome('code', asStr(data['desafio']));
+    if (data['requiere_configurar_2fa'] == true) return LoginOutcome('setup', asStr(data['desafio']));
+    await _enter(data);
+    return const LoginOutcome('ok');
+  }
+
+  Future<void> _enter(Map<String, dynamic> data) async {
     await _beginSession(data);
     _loadLocalForUser();
     _setStatus(AuthStatus.loggedIn);
     syncPending();
+  }
+
+  /// Segundo paso del login: codigo de la app de autenticacion o codigo de respaldo.
+  Future<void> verifyTwoFactor(String desafio, String codigo) async {
+    final data = asMap(await api.post('/api/auth/login/2fa', body: {'desafio': desafio, 'codigo': codigo.trim()}, auth: false));
+    await _enter(data);
+  }
+
+  /// Admin sin 2FA: pide el secreto para configurarlo (todavia no tiene sesion).
+  Future<Map<String, dynamic>> startInitialTwoFactor(String desafio) async =>
+      asMap(await api.post('/api/auth/login/2fa/setup', body: {'desafio': desafio}, auth: false));
+
+  Map<String, dynamic>? _pendingLogin;
+
+  /// Confirma el 2FA inicial. Devuelve los codigos de respaldo; la sesion se abre al llamar finishPendingLogin()
+  /// (asi la persona alcanza a guardar los codigos antes de entrar).
+  Future<List<String>> confirmInitialTwoFactor(String desafio, String codigo) async {
+    final data = asMap(await api.post('/api/auth/login/2fa/confirm', body: {'desafio': desafio, 'codigo': codigo.trim()}, auth: false));
+    _pendingLogin = data;
+    final lista = data['codigos_respaldo'];
+    return lista is List ? lista.map((e) => e.toString()).toList() : <String>[];
+  }
+
+  Future<void> finishPendingLogin() async {
+    final d = _pendingLogin;
+    _pendingLogin = null;
+    if (d != null) await _enter(d);
+  }
+
+  Future<void> forgotPassword(String email) async {
+    await api.post('/api/auth/password/forgot', body: {'email': email.trim()}, auth: false);
+  }
+
+  Future<void> resetPassword(String email, String codigo, String nueva) async {
+    await api.post('/api/auth/password/reset', body: {'email': email.trim(), 'codigo': codigo.trim(), 'nueva': nueva}, auth: false);
   }
 
   Future<void> register({
@@ -124,13 +176,16 @@ class AppState extends ChangeNotifier {
     required double altura,
     required String nivel,
     required String condiciones,
+    required Map<String, bool> consentimientos,
+    required String versionConsentimiento,
   }) async {
     final data = asMap(await api.post('/api/auth/register', auth: false, body: {
       'nombre': nombre,
       'apellido': apellido,
       'email': email.trim(),
       'password': password,
-      'consentimientos': {'tratamiento_datos': true, 'datos_salud': true},
+      'consentimientos': consentimientos,
+      'version_consentimiento': versionConsentimiento,
     }));
     await _beginSession(data);
     await setExperience(nivel);
@@ -138,7 +193,7 @@ class AppState extends ChangeNotifier {
     String? aviso;
     try {
       await api.post('/api/clinical/students/me/measurements', body: {'peso_kg': peso, 'estatura_cm': altura});
-      if (condiciones.trim().isNotEmpty) {
+      if (condiciones.trim().isNotEmpty && consentimientos['datos_salud'] == true) {
         await api.put('/api/clinical/students/me/history', body: {'condiciones': condiciones.trim()});
       }
     } catch (_) {
@@ -150,11 +205,11 @@ class AppState extends ChangeNotifier {
 
   Future<void> _beginSession(Map<String, dynamic> data) async {
     final u = asMap(data['usuario']);
-    if (asStr(u['rol']) != 'estudiante') {
+    if (!kRolesApp.contains(asStr(u['rol']))) {
       try {
         await api.post('/api/auth/logout', body: {'refreshToken': data['refreshToken']}, auth: false);
       } catch (_) {}
-      throw const ApiException(403, 'SOLO_ESTUDIANTES', 'Esta app es solo para estudiantes. Docentes y administradores usan el acceso web.');
+      throw const ApiException(403, 'ROL_NO_SOPORTADO', 'Esta cuenta no puede usar la app.');
     }
     final access = asStr(data['accessToken']);
     final refresh = asStr(data['refreshToken']);
@@ -217,10 +272,8 @@ class AppState extends ChangeNotifier {
 
   void _setStatus(AuthStatus s) {
     status = s;
-    if (s != AuthStatus.loggedIn) {
-      navigatorKey.currentState?.popUntil((route) => route.isFirst);
-      shellTab.value = 0;
-    }
+    navigatorKey.currentState?.popUntil((route) => route.isFirst); // cierra login / registro / 2FA apilados
+    if (s != AuthStatus.loggedIn) shellTab.value = 0;
     version++;
     notifyListeners();
   }

@@ -1,4 +1,6 @@
 import '../common.dart';
+import '../widgets/consent_check.dart';
+import 'security_screens.dart';
 
 // ====================================================================== SPLASH
 class SplashScreen extends StatelessWidget {
@@ -91,8 +93,17 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _loading = true);
     try {
-      await app.login(email, _pass.text);
-      toast('Bienvenido de nuevo', type: ToastType.success);
+      final out = await app.login(email, _pass.text);
+      if (!mounted) return;
+      if (out.step == 'code') {
+        _pass.clear();
+        await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => TwoFactorCodeScreen(desafio: out.desafio)));
+      } else if (out.step == 'setup') {
+        _pass.clear();
+        await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => TwoFactorSetupScreen(desafio: out.desafio)));
+      } else {
+        toast('Bienvenido de nuevo', type: ToastType.success);
+      }
     } on ApiException catch (e) {
       if (!mounted) return;
       if (e.code == 'CREDENCIALES_INVALIDAS') setState(() => _passErr = 'Correo o contraseña incorrectos');
@@ -136,7 +147,20 @@ class _LoginScreenState extends State<LoginScreen> {
                     onChanged: (_) => setState(() => _passErr = null),
                     onSubmitted: (_) => _submit(),
                   ),
-                  const SizedBox(height: 6),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _loading
+                          ? null
+                          : () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ForgotPasswordScreen(email: _email.text.trim()))),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Text('¿Olvidaste tu contraseña?', style: Tx.body(size: 12.5, w: FontWeight.w700, color: C.inkSoft)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
                   PfButton('Iniciar sesión', kind: BtnKind.gold, loading: _loading, onPressed: _submit),
                   const SizedBox(height: 10),
                   PfButton(
@@ -172,7 +196,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _email = TextEditingController();
   final _pass = TextEditingController();
   final _pass2 = TextEditingController();
-  bool _consent = false;
+  final Map<String, bool> _accepted = <String, bool>{}; // tipo de consentimiento -> aceptado
+  Map<String, dynamic>? _consentTexts; // textos y version que manda el servidor
+  bool _textsFailed = false;
 
   final _peso = TextEditingController();
   final _altura = TextEditingController();
@@ -181,6 +207,69 @@ class _RegisterScreenState extends State<RegisterScreen> {
   int _lesion = 0; // 0 = no, 1 = si
 
   final Map<String, String> _err = <String, String>{};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTexts();
+  }
+
+  Future<void> _loadTexts() async {
+    setState(() => _textsFailed = false);
+    try {
+      final data = asMap(await app.api.get('/api/auth/consent-texts'));
+      if (mounted) setState(() => _consentTexts = data);
+    } on ApiException {
+      if (mounted) setState(() => _textsFailed = true);
+    }
+  }
+
+  Map<String, dynamic>? _textoDe(String tipo) {
+    for (final t in asList(_consentTexts?['textos'])) {
+      if (asStr(t['tipo']) == tipo) return t;
+    }
+    return null;
+  }
+
+  /// Casillas de consentimiento de los tipos pedidos, con el texto completo que manda el servidor.
+  Widget _consentBlock(List<String> tipos) {
+    if (_consentTexts == null) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: _textsFailed
+            ? Row(children: [
+                Expanded(child: Text('No pude cargar los textos de consentimiento.', style: Tx.body(size: 12, color: C.error))),
+                GestureDetector(
+                  onTap: _loadTexts,
+                  child: Text('Reintentar', style: Tx.body(size: 12.5, w: FontWeight.w800)),
+                ),
+              ])
+            : Row(children: [
+                const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: C.gold)),
+                const SizedBox(width: 10),
+                Text('Cargando textos de consentimiento…', style: Tx.body(size: 12, color: C.inkSoft)),
+              ]),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final tipo in tipos)
+          if (_textoDe(tipo) != null)
+            ConsentCheck(
+              title: asStr(_textoDe(tipo)!['titulo']),
+              text: asStr(_textoDe(tipo)!['texto']),
+              isRequired: asBool(_textoDe(tipo)!['obligatorio']),
+              value: _accepted[tipo] == true,
+              error: _err[tipo],
+              onChanged: (v) => setState(() {
+                _accepted[tipo] = v;
+                _err.remove(tipo);
+              }),
+            ),
+      ],
+    );
+  }
 
   @override
   void dispose() {
@@ -209,7 +298,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _err['pass'] = 'Máximo 72 caracteres';
     }
     if (_pass2.text != p) _err['pass2'] = 'Las contraseñas no coinciden';
-    if (!_consent) _err['consent'] = 'Debes aceptar el tratamiento de datos para continuar';
+    if (_consentTexts == null) {
+      _err['consent'] = 'Espera a que carguen los textos de consentimiento';
+    } else {
+      if (_accepted['tratamiento_datos'] != true) _err['tratamiento_datos'] = 'Debes aceptar el tratamiento de datos para continuar';
+      if (_accepted['mayoria_edad'] != true) _err['mayoria_edad'] = 'Debes confirmar que eres mayor de 18 años';
+    }
     setState(() {});
     return _err.isEmpty;
   }
@@ -222,6 +316,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (alt != null && alt < 3) alt = alt * 100; // "1.75" -> 175 cm
     if (alt == null || alt < 120 || alt > 230) _err['altura'] = 'Altura entre 120 y 230 cm';
     if (_lesion == 1 && _cond.text.trim().isEmpty) _err['cond'] = 'Describe brevemente tu lesión o condición';
+    if (_lesion == 1 && _accepted['datos_salud'] != true) {
+      _err['datos_salud'] = 'Para guardar tu condición debes autorizar el tratamiento de tus datos de salud';
+    }
     setState(() {});
     return _err.isEmpty;
   }
@@ -246,6 +343,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         altura: alt,
         nivel: _niveles[_nivel],
         condiciones: _lesion == 1 ? _cond.text : '',
+        consentimientos: <String, bool>{
+          for (final t in asList(_consentTexts?['textos'])) asStr(t['tipo']): _accepted[asStr(t['tipo'])] == true,
+        },
+        versionConsentimiento: asStr(_consentTexts?['version']),
       );
       toast('¡Cuenta creada! Bienvenido a PlayFit', type: ToastType.success);
     } on ApiException catch (e) {
@@ -255,6 +356,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
           _step = 1;
           _err['email'] = 'Ya existe una cuenta con ese correo';
         });
+      }
+      if (e.code == 'TEXTOS_DESACTUALIZADOS') {
+        setState(() {
+          _step = 1;
+          _consentTexts = null;
+          _accepted.clear();
+        });
+        _loadTexts();
       }
       if (e.code == 'PASSWORD_DEBIL') {
         setState(() {
@@ -308,40 +417,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
           action: TextInputAction.done,
           onChanged: (_) => setState(() => _err.remove('pass2')),
         ),
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => setState(() {
-            _consent = !_consent;
-            _err.remove('consent');
-          }),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 140),
-                width: 22,
-                height: 22,
-                margin: const EdgeInsets.only(top: 1),
-                decoration: BoxDecoration(
-                  color: _consent ? C.ink : C.surface,
-                  borderRadius: BorderRadius.circular(7),
-                  border: Border.all(color: _err['consent'] != null ? C.error : (_consent ? C.ink : C.lineStrong), width: 1.5),
-                ),
-                child: _consent ? const Center(child: LIcon('check', size: 14, color: C.cream)) : null,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Acepto el tratamiento de mis datos personales y de salud para usar PlayFit, según la Ley 1581 de 2012. Puedo revocarlo o eliminar mi cuenta cuando quiera.',
-                  style: Tx.body(size: 12, color: C.inkSoft, height: 1.5),
-                ),
-              ),
-            ],
-          ),
-        ),
+        const SizedBox(height: 4),
+        _consentBlock(const ['tratamiento_datos', 'mayoria_edad']),
         if (_err['consent'] != null)
           Padding(
-            padding: const EdgeInsets.only(top: 6),
+            padding: const EdgeInsets.only(bottom: 6),
             child: Text(_err['consent']!, style: Tx.body(size: 11.5, w: FontWeight.w600, color: C.error)),
           ),
         const SizedBox(height: 22),
@@ -364,7 +444,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         Text('Paso 2 de 2 · tu punto de partida', style: Tx.body(size: 13, color: C.inkSoft)),
         const SizedBox(height: 14),
         const PanelNote(
-          'Estos datos son privados: solo los ves tú y tu docente. La app solo usa indicadores generales (nunca el texto de tu historial) para adaptar recomendaciones.',
+          'Estos datos son privados: solo los ves tú. Ni el equipo de PlayFit puede leerlos y la app solo usa indicadores generales (nunca el texto de tu historial) para adaptar recomendaciones.',
           icon: 'shield-check',
         ),
         Row(
@@ -411,7 +491,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
             error: _err['cond'],
             onChanged: (_) => setState(() => _err.remove('cond')),
           ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 6),
+        const SectionLabel('Permisos opcionales'),
+        _consentBlock(const ['datos_salud', 'uso_camara', 'ia_chatbot']),
         PfButton('Crear cuenta y empezar', kind: BtnKind.gold, loading: _loading, onPressed: _submit),
         const SizedBox(height: 10),
         PfButton('Atrás', kind: BtnKind.secondary, onPressed: _loading ? null : () => setState(() => _step = 1)),

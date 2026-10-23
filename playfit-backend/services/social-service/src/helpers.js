@@ -38,7 +38,7 @@ async function otorgarInsignia(estudianteId, codigo, t) {
 }
 
 const squadDe = async (estudianteId, t) =>
-  one('SELECT sm.squad_id, sm.rol, s.nombre, s.lider_id, s.max_miembros, s.codigo_invitacion, s.curso_id FROM squad_miembros sm JOIN squads s ON s.id=sm.squad_id WHERE sm.estudiante_id=:e', { e: estudianteId }, t);
+  one('SELECT sm.squad_id, sm.rol, s.nombre, s.lider_id, s.max_miembros, s.codigo_invitacion FROM squad_miembros sm JOIN squads s ON s.id=sm.squad_id WHERE sm.estudiante_id=:e', { e: estudianteId }, t);
 
 async function publicarFeed(estudianteId, tipo, detalle, t) {
   const sm = await one('SELECT squad_id FROM squad_miembros WHERE estudiante_id=:e', { e: estudianteId }, t);

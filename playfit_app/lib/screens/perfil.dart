@@ -1,5 +1,6 @@
 import '../common.dart';
 import 'ranking.dart';
+import 'security_screens.dart';
 import 'sesiones.dart';
 
 // ====================================================================== PESTAÑA PERFIL
@@ -237,7 +238,7 @@ class _HistorialClinicoScreenState extends State<HistorialClinicoScreen> {
 
           if (_editing) {
             return PfList(children: [
-              const PanelNote('Tus datos son privados: solo los ves tú y tu docente.', icon: 'shield-check'),
+              const PanelNote('Tus datos son privados: solo los ves tú.', icon: 'shield-check'),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -282,7 +283,7 @@ class _HistorialClinicoScreenState extends State<HistorialClinicoScreen> {
 
           return PfList(onRefresh: reload, children: [
             const PanelNote(
-              'Solo tú y tu docente pueden ver estos datos. Cada consulta queda registrada y esta pantalla no guarda copias en tu teléfono.',
+              'Solo tú puedes ver estos datos. Cada consulta queda registrada y esta pantalla no guarda copias en tu teléfono.',
               icon: 'lock',
             ),
             MetricGrid([
@@ -508,8 +509,9 @@ class _CuentaScreenState extends State<CuentaScreen> {
             ],
           ),
         ),
-        const SectionLabel('Permisos'),
-        PfCard(
+        if (!app.isAdmin) const SectionLabel('Permisos'),
+        if (!app.isAdmin)
+          PfCard(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
           child: Column(
             children: [
@@ -521,12 +523,20 @@ class _CuentaScreenState extends State<CuentaScreen> {
         ),
         const SectionLabel('Seguridad'),
         RowCard([
+          if (!app.isAdmin)
+            RowTile(
+              title: 'Historial clínico',
+              sub: 'Revisa y edita tus datos de salud',
+              left: const IconDisc('shield-check', tone: 'green'),
+              chevron: true,
+              onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const HistorialClinicoScreen())),
+            ),
           RowTile(
-            title: 'Historial clínico',
-            sub: 'Revisa y edita tus datos de salud',
-            left: const IconDisc('shield-check', tone: 'green'),
+            title: 'Verificación en dos pasos',
+            sub: app.isAdmin ? 'Obligatoria para administradores' : 'Pide un código de tu celular al iniciar sesión',
+            left: const IconDisc('lock', tone: 'purple'),
             chevron: true,
-            onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const HistorialClinicoScreen())),
+            onTap: () => openTwoFactorSettings(context),
           ),
           RowTile(
             title: 'Cambiar contraseña',
@@ -537,8 +547,8 @@ class _CuentaScreenState extends State<CuentaScreen> {
         ]),
         const SizedBox(height: 4),
         PfButton('Cerrar sesión', kind: BtnKind.secondary, icon: 'log-out', onPressed: _logout),
-        const SizedBox(height: 10),
-        PfButton('Eliminar mi cuenta', kind: BtnKind.danger, onPressed: _deleteAccount),
+        if (!app.isAdmin) const SizedBox(height: 10),
+        if (!app.isAdmin) PfButton('Eliminar mi cuenta', kind: BtnKind.danger, onPressed: _deleteAccount),
         const SizedBox(height: 16),
         Center(child: Text('PlayFit 0.6.0', style: Tx.body(size: 11, color: C.inkMute))),
       ]),

@@ -29,6 +29,7 @@ test('base vacia: crea esquema, carga seed, protege las cuentas y aplica migraci
   assert.ok(contiene(bd, 'CREATE TABLE usuarios'), 'debe correr 01_schema.sql');
   assert.ok(contiene(bd, 'INSERT INTO usuarios'), 'debe correr 02_seed.sql');
   assert.ok(contiene(bd, 'intentos_login'), 'debe correr 03_fase7.sql');
+  assert.ok(contiene(bd, 'codigos_verificacion'), 'debe correr 04_fase11.sql');
   const upd = bd.consultas.find((c) => c.sql.startsWith('UPDATE usuarios SET password_hash'));
   assert.ok(upd, 'debe reemplazar las contrasenas del seed');
   assert.ok(await bcrypt.compare('clave-demo-segura', upd.opts.replacements.h));
@@ -42,6 +43,7 @@ test('base con datos: NO toca el esquema (no hay DROP) y solo aplica migraciones
   assert.ok(!contiene(bd, 'DROP TABLE'), 'jamas debe borrar tablas de una base con datos');
   assert.ok(!contiene(bd, 'UPDATE usuarios'));
   assert.ok(contiene(bd, 'intentos_login'));
+  assert.ok(contiene(bd, 'codigos_verificacion'));
 });
 
 test('espera a que MariaDB arranque antes de rendirse', async () => {

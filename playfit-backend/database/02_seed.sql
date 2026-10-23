@@ -6,7 +6,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 
 SET @hoy = CURDATE();
 
-INSERT INTO roles (id,nombre) VALUES (1,'estudiante'),(2,'docente'),(3,'admin');
+INSERT INTO roles (id,nombre) VALUES (1,'estudiante'),(2,'admin');
 
 INSERT INTO flags_clinicos (codigo,descripcion) VALUES
 ('SIN_RESTRICCIONES','Sin restricciones para el ejercicio'),
@@ -82,8 +82,7 @@ INSERT INTO insignias (id,codigo,nombre,descripcion,icono) VALUES
 (6,'RETO_COMPLETADO','Retador','Completaste tu primer reto.','trophy');
 
 INSERT INTO usuarios (id,rol_id,nombre,apellido,email,password_hash,codigo_estudiantil,avatar_color,ultimo_login) VALUES
-(1,3,'Admin','PlayFit','admin@playfit.test','$2b$10$EwIWc1d0.IJbiYvu4qih9u8ScvI6cThJ9s6EeIoENWXSzPSyu1VOq',NULL,'#111827',NOW()),
-(2,2,'Marcela','Rojas','docente@playfit.test','$2b$10$EwIWc1d0.IJbiYvu4qih9u8ScvI6cThJ9s6EeIoENWXSzPSyu1VOq',NULL,'#0EA5E9',NOW()),
+(1,2,'Admin','PlayFit','admin@playfit.test','$2b$10$EwIWc1d0.IJbiYvu4qih9u8ScvI6cThJ9s6EeIoENWXSzPSyu1VOq',NULL,'#111827',NOW()),
 (3,1,'Ana','Torres','ana@playfit.test','$2b$10$EwIWc1d0.IJbiYvu4qih9u8ScvI6cThJ9s6EeIoENWXSzPSyu1VOq','20231001','#EF4444',NOW()),
 (4,1,'Luis','Moreno','luis@playfit.test','$2b$10$EwIWc1d0.IJbiYvu4qih9u8ScvI6cThJ9s6EeIoENWXSzPSyu1VOq','20231002','#F59E0B',NOW()),
 (5,1,'Camila','Pardo','camila@playfit.test','$2b$10$EwIWc1d0.IJbiYvu4qih9u8ScvI6cThJ9s6EeIoENWXSzPSyu1VOq','20231003','#10B981',NOW()),
@@ -115,33 +114,26 @@ INSERT INTO consentimientos (usuario_id,tipo,aceptado,version_politica) VALUES
 (8,'tratamiento_datos',1,'1.0'),
 (8,'datos_salud',1,'1.0'),
 (8,'uso_camara',1,'1.0'),
-(8,'ia_chatbot',1,'1.0');
+(8,'ia_chatbot',1,'1.0'),
+(3,'mayoria_edad',1,'1.0'),(4,'mayoria_edad',1,'1.0'),(5,'mayoria_edad',1,'1.0'),
+(6,'mayoria_edad',1,'1.0'),(7,'mayoria_edad',1,'1.0'),(8,'mayoria_edad',1,'1.0');
 
-INSERT INTO cursos (id,nombre,periodo,docente_id) VALUES (1,'Acondicionamiento Físico','2026-2',2);
-
-INSERT INTO curso_estudiantes (curso_id,estudiante_id) VALUES
-(1,3),
-(1,4),
-(1,5),
-(1,6),
-(1,7),
-(1,8);
 
 INSERT INTO historiales_clinicos (estudiante_id,fecha_nacimiento,actualizado_por) VALUES
-(3,DATE_SUB(@hoy, INTERVAL 19 YEAR),2),
-(4,DATE_SUB(@hoy, INTERVAL 20 YEAR),2),
-(5,DATE_SUB(@hoy, INTERVAL 21 YEAR),2),
-(6,DATE_SUB(@hoy, INTERVAL 22 YEAR),2),
-(7,DATE_SUB(@hoy, INTERVAL 23 YEAR),2),
-(8,DATE_SUB(@hoy, INTERVAL 24 YEAR),2);
+(3,DATE_SUB(@hoy, INTERVAL 19 YEAR),NULL),
+(4,DATE_SUB(@hoy, INTERVAL 20 YEAR),NULL),
+(5,DATE_SUB(@hoy, INTERVAL 21 YEAR),NULL),
+(6,DATE_SUB(@hoy, INTERVAL 22 YEAR),NULL),
+(7,DATE_SUB(@hoy, INTERVAL 23 YEAR),NULL),
+(8,DATE_SUB(@hoy, INTERVAL 24 YEAR),NULL);
 
 INSERT INTO estudiante_flags (estudiante_id,flag_codigo,origen) VALUES
-(3,'SIN_RESTRICCIONES','docente'),
-(4,'LESION_RODILLA','docente'),
-(5,'ASMA_EJERCICIO','docente'),
-(6,'SIN_RESTRICCIONES','docente'),
-(7,'SIN_RESTRICCIONES','docente'),
-(8,'HIPERTENSION','docente');
+(3,'SIN_RESTRICCIONES','sistema'),
+(4,'LESION_RODILLA','sistema'),
+(5,'ASMA_EJERCICIO','sistema'),
+(6,'SIN_RESTRICCIONES','sistema'),
+(7,'SIN_RESTRICCIONES','sistema'),
+(8,'HIPERTENSION','sistema');
 
 INSERT INTO mediciones_corporales (estudiante_id,fecha,peso_kg,estatura_cm) VALUES
 (3,@hoy,62,165),
@@ -525,18 +517,18 @@ INSERT INTO series_ejercicio (sesion_id,ejercicio_id,orden,repeticiones,peso_kg,
 (43,4,5,7,16,NULL,'camara'),
 (43,4,6,7,28,NULL,'camara');
 
-INSERT INTO squads (id,nombre,descripcion,codigo_invitacion,lider_id,curso_id) VALUES
-(1,'Los Titanes','Constancia ante todo','TIT4N001',3,1),
-(2,'Mancuernas FC','Entrenamos después de clase','MAN7C002',7,1);
+INSERT INTO squads (id,nombre,descripcion,codigo_invitacion,lider_id) VALUES
+(1,'Los Titanes','Constancia ante todo','TIT4N001',3),
+(2,'Mancuernas FC','Entrenamos después de clase','MAN7C002',7);
 
 INSERT INTO squad_miembros (squad_id,estudiante_id,rol) VALUES
 (1,3,'lider'),(1,4,'miembro'),(1,5,'miembro'),(1,6,'miembro'),(2,7,'lider'),(2,8,'miembro');
 
 INSERT INTO retos (id,titulo,descripcion,tipo,metrica,ejercicio_id,meta,xp_recompensa,fecha_inicio,fecha_fin,creado_por) VALUES
-(1,'100 sentadillas en la semana','Acumula 100 repeticiones de sentadilla.','individual','reps',1,100,100,DATE_SUB(@hoy, INTERVAL 7 DAY),DATE_ADD(@hoy, INTERVAL 7 DAY),2),
-(2,'Squad 300 flexiones','Entre todo el squad, lleguen a 300 flexiones.','squad','reps',2,300,200,DATE_SUB(@hoy, INTERVAL 10 DAY),DATE_ADD(@hoy, INTERVAL 4 DAY),2),
-(3,'7 días activos','Entrena al menos 7 días en dos semanas.','curso','dias_activos',NULL,7,150,DATE_SUB(@hoy, INTERVAL 14 DAY),DATE_ADD(@hoy, INTERVAL 0 DAY),2),
-(4,'Primera semana','Completa 3 sesiones en tu primera semana.','individual','sesiones',NULL,3,50,DATE_SUB(@hoy, INTERVAL 14 DAY),DATE_ADD(@hoy, INTERVAL -7 DAY),2);
+(1,'100 sentadillas en la semana','Acumula 100 repeticiones de sentadilla.','individual','reps',1,100,100,DATE_SUB(@hoy, INTERVAL 7 DAY),DATE_ADD(@hoy, INTERVAL 7 DAY),1),
+(2,'Squad 300 flexiones','Entre todo el squad, lleguen a 300 flexiones.','squad','reps',2,300,200,DATE_SUB(@hoy, INTERVAL 10 DAY),DATE_ADD(@hoy, INTERVAL 4 DAY),1),
+(3,'7 días activos','Entrena al menos 7 días en dos semanas.','individual','dias_activos',NULL,7,150,DATE_SUB(@hoy, INTERVAL 14 DAY),DATE_ADD(@hoy, INTERVAL 0 DAY),1),
+(4,'Primera semana','Completa 3 sesiones en tu primera semana.','individual','sesiones',NULL,3,50,DATE_SUB(@hoy, INTERVAL 14 DAY),DATE_ADD(@hoy, INTERVAL -7 DAY),1);
 
 INSERT INTO reto_participaciones (reto_id,estudiante_id,squad_id,progreso,completado_at) VALUES
 (1,3,1,75,NULL),
@@ -666,6 +658,6 @@ INSERT INTO notificaciones (usuario_id,tipo,titulo,cuerpo) VALUES
 (3,'racha','¡12 días seguidos!','Tu racha sigue creciendo.'),
 (6,'racha','Tu racha se rompió','Entrena hoy para empezar una nueva.');
 
-INSERT INTO auditoria_accesos (usuario_id,accion,recurso,recurso_id,ip) VALUES (2,'actualizar','historial_clinico',1,'127.0.0.1');
+INSERT INTO auditoria_accesos (usuario_id,accion,recurso,recurso_id,ip) VALUES (3,'actualizar','historial_clinico',3,'127.0.0.1');
 
 SET FOREIGN_KEY_CHECKS = 1;

@@ -24,9 +24,8 @@ test('mascota: elige el mensaje mas especifico segun los datos reales', async ()
   assert.equal((await content.elegirMensaje('comparacion', { estado: 'pierdes' })).pose, 'enfocado');
   assert.equal((await content.elegirMensaje('bienvenida', {})).pose, 'feliz');               // sin condicion = respaldo
 });
-test('mascota: AUSENTE en pantallas clinicas y para docente/admin', async () => {
+test('mascota: AUSENTE en pantallas clinicas y para admin', async () => {
   for (const pantalla of ['historial_clinico', 'mediciones', 'flags']) assert.equal(await content.elegirMensaje('bienvenida', {}, { pantalla, rol: 'estudiante' }), null);
-  assert.equal(await content.elegirMensaje('bienvenida', {}, { pantalla: 'inicio', rol: 'docente' }), null);
   assert.equal(await content.elegirMensaje('bienvenida', {}, { pantalla: 'inicio', rol: 'admin' }), null);
   assert.ok(await content.elegirMensaje('bienvenida', {}, { pantalla: 'dashboard', rol: 'estudiante' }));
 });
@@ -95,7 +94,7 @@ test('IA: validaciones, rol y modelo no configurado', async () => {
   await darConsentimientoIA(8);
   await rechaza(ia.chat(S.SEBAS, { mensaje: '   ' }, { llm: crearLlmFalso() }), 'DATOS_INVALIDOS');
   await rechaza(ia.chat(S.SEBAS, { mensaje: 'x'.repeat(1001) }, { llm: crearLlmFalso() }), 'DATOS_INVALIDOS');
-  await rechaza(ia.chat(S.DOCENTE, { mensaje: 'hola' }, { llm: crearLlmFalso() }), 'PROHIBIDO');
+  await rechaza(ia.chat(S.ADMIN, { mensaje: 'hola' }, { llm: crearLlmFalso() }), 'PROHIBIDO');
   await rechaza(ia.chat(S.SEBAS, { mensaje: 'hola' }, {}), 'IA_NO_CONFIGURADA');
 });
 test('cliente Gemini: arma la peticion REST correcta (probado con fetch simulado, sin red)', async () => {

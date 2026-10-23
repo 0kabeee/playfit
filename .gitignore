@@ -8,3 +8,6 @@ Thumbs.db
 # Secretos de Kubernetes (los genera k8s/generar-secretos.js)
 k8s/overlays/*/secrets.env
 secrets.env
+_to_delete/
+
+.idea/

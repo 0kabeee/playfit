@@ -65,8 +65,9 @@ function createGateway({
   app.use('/api', limitador(limiteGlobal, 60 * 1000, 'LIMITE_EXCEDIDO', 'Demasiadas peticiones. Espera un momento.'));
   const MSG_AUTH = 'Demasiados intentos. Espera unos minutos antes de volver a intentar.';
   // Login: solo cuentan los intentos FALLIDOS (varios estudiantes en la misma WiFi no se bloquean entre si al entrar bien).
-  app.post('/api/auth/login', limitador(limiteAuth, ventanaAuthMs, 'DEMASIADOS_INTENTOS', MSG_AUTH, { skipSuccessfulRequests: true }));
-  for (const ruta of ['/api/auth/register', '/api/auth/refresh']) app.post(ruta, limitador(limiteAuth, ventanaAuthMs, 'DEMASIADOS_INTENTOS', MSG_AUTH));
+  // el login (con o sin 2FA), el codigo de 2FA y la recuperacion de contrasena comparten el mismo tipo de limite
+  app.post(['/api/auth/login', '/api/auth/login/2fa', '/api/auth/login/2fa/confirm'], limitador(limiteAuth, ventanaAuthMs, 'DEMASIADOS_INTENTOS', MSG_AUTH, { skipSuccessfulRequests: true }));
+  for (const ruta of ['/api/auth/register', '/api/auth/refresh', '/api/auth/password/forgot', '/api/auth/password/reset', '/api/auth/login/2fa/setup']) app.post(ruta, limitador(limiteAuth, ventanaAuthMs, 'DEMASIADOS_INTENTOS', MSG_AUTH));
 
   // ---- proxys (se montan en la raiz con pathFilter para conservar la ruta completa /api/...) ----
   for (const { nombre, prefijo } of SERVICIOS) {

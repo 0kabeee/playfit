@@ -1,8 +1,8 @@
 // Mascota: elige mensaje y pose segun datos reales. Reglas de condicion en la tabla mascota_mensajes.
-// Principio: la mascota NO aparece en pantallas clinicas ni en vistas de docente/admin.
+// Principio: la mascota NO aparece en pantallas clinicas ni en vistas de admin.
 const { select } = require('@playfit/shared');
 
-const PANTALLAS_SIN_MASCOTA = ['historial_clinico', 'mediciones', 'flags', 'docente', 'admin'];
+const PANTALLAS_SIN_MASCOTA = ['historial_clinico', 'mediciones', 'flags', 'admin'];
 const mascotaPermitida = (pantalla, rol) => rol === 'estudiante' && !PANTALLAS_SIN_MASCOTA.includes(pantalla);
 
 // Evalua condiciones tipo 'racha>=7', 'puesto=1', 'puesto>3' o palabras como 'completado' / 'ganas'.

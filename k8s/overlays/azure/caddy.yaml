@@ -48,7 +48,9 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
-            capabilities: { drop: ["ALL"] }
+            # El binario de Caddy trae el permiso NET_BIND_SERVICE: sin devolverselo, Linux no lo deja ejecutar
+            # ("exec /usr/bin/caddy: operation not permitted"). Es el unico permiso que el perfil restricted admite.
+            capabilities: { drop: ["ALL"], add: ["NET_BIND_SERVICE"] }
           volumeMounts:
             - { name: caddyfile, mountPath: /etc/caddy/Caddyfile, subPath: Caddyfile }
             - { name: datos, mountPath: /data }

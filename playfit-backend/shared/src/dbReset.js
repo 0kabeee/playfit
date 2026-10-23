@@ -12,6 +12,7 @@ async function resetDb({ nombre = process.env.DB_NAME || 'playfit_dev', seed = t
   await sql.query(fs.readFileSync(path.join(dir, '01_schema.sql'), 'utf8'));
   if (seed) await sql.query(fs.readFileSync(path.join(dir, '02_seed.sql'), 'utf8'));
   await sql.query(fs.readFileSync(path.join(dir, '03_fase7.sql'), 'utf8'));
+  await sql.query(fs.readFileSync(path.join(dir, '04_fase11.sql'), 'utf8'));
   await sql.close();
 }
 module.exports = { resetDb };

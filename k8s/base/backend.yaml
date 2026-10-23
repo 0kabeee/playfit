@@ -64,6 +64,19 @@ spec:
                 secretKeyRef:
                   name: playfit-secrets
                   key: JWT_SECRET
+            # Correo (recuperacion de contrasena) por Brevo. Opcionales: sin ellos el codigo solo se imprime en el log del pod.
+            - name: BREVO_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: playfit-secrets
+                  key: BREVO_API_KEY
+                  optional: true
+            - name: MAIL_FROM
+              valueFrom:
+                secretKeyRef:
+                  name: playfit-secrets
+                  key: MAIL_FROM
+                  optional: true
           readinessProbe:
             httpGet: { path: /health, port: http }
             periodSeconds: 10

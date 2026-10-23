@@ -256,7 +256,7 @@ class _RegistrarSesionScreenState extends State<RegistrarSesionScreen> {
       final motivos = (a['motivos'] is List ? (a['motivos'] as List).map((m) => Fmt.flagLabel(m.toString())).join(', ') : '');
       extra.add(const SizedBox(height: 10));
       extra.add(PanelNote(
-        '${asStr(a['ejercicio'])} puede no ser el más adecuado para ti ($motivos). Consúltalo con tu docente antes de aumentar la carga.',
+        '${asStr(a['ejercicio'])} puede no ser el más adecuado para ti ($motivos). Consúltalo con un profesional de salud antes de aumentar la carga.',
         icon: 'triangle-alert',
         bg: C.yellowBg,
       ));

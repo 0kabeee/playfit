@@ -86,7 +86,7 @@ test('validaciones de sesion', async () => {
   await rechaza(soc.registrarSesion(S.ANA, { ejercicios: [ses(999, 5)] }), 'EJERCICIO_INVALIDO');
   await rechaza(soc.registrarSesion(S.ANA, { ejercicios: [ses(3, { repeticiones: 5, fuente_conteo: 'camara' })] }), 'DATOS_INVALIDOS'); // peso muerto sin camara
   await rechaza(soc.registrarSesion(S.ANA, { ejercicios: [ses(1, ...Array(41).fill(5))] }), 'DATOS_INVALIDOS');
-  await rechaza(soc.registrarSesion(S.DOCENTE, { ejercicios: [ses(1, 5)] }), 'PROHIBIDO');
+  await rechaza(soc.registrarSesion(S.ADMIN, { ejercicios: [ses(1, 5)] }), 'PROHIBIDO');
   const ok = await soc.registrarSesion(S.ANA, { ejercicios: [ses(7, { duracion_seg: 60 })] });
   assert.ok(ok.sesion_id);
 });
@@ -112,17 +112,17 @@ test('historial de sesiones trae las series agrupadas', async () => {
 });
 
 // ---------- retos ----------
-test('retos: docente crea, estudiante no; validaciones', async () => {
+test('retos: admin crea, usuario no; validaciones', async () => {
   const hoy = clock.hoy();
   const base = { titulo: 'Reto nuevo', descripcion: 'Descripcion', tipo: 'individual', metrica: 'sesiones', meta: 5, fecha_fin: clock.addDays(hoy, 10) };
-  const r = await soc.crearReto(S.DOCENTE, base);
+  const r = await soc.crearReto(S.ADMIN, base);
   assert.equal(r.meta, 5);
   await rechaza(soc.crearReto(S.ANA, base), 'PROHIBIDO');
-  await rechaza(soc.crearReto(S.DOCENTE, { ...base, metrica: 'reps' }), 'DATOS_INVALIDOS');           // reps exige ejercicio
-  await rechaza(soc.crearReto(S.DOCENTE, { ...base, meta: 0 }), 'DATOS_INVALIDOS');
-  await rechaza(soc.crearReto(S.DOCENTE, { ...base, tipo: 'raro' }), 'DATOS_INVALIDOS');
-  await rechaza(soc.crearReto(S.DOCENTE, { ...base, fecha_fin: clock.addDays(hoy, -1) }), 'DATOS_INVALIDOS');
-  await rechaza(soc.crearReto(S.DOCENTE, { ...base, fecha_fin: clock.addDays(hoy, 200) }), 'DATOS_INVALIDOS');
+  await rechaza(soc.crearReto(S.ADMIN, { ...base, metrica: 'reps' }), 'DATOS_INVALIDOS');           // reps exige ejercicio
+  await rechaza(soc.crearReto(S.ADMIN, { ...base, meta: 0 }), 'DATOS_INVALIDOS');
+  await rechaza(soc.crearReto(S.ADMIN, { ...base, tipo: 'raro' }), 'DATOS_INVALIDOS');
+  await rechaza(soc.crearReto(S.ADMIN, { ...base, fecha_fin: clock.addDays(hoy, -1) }), 'DATOS_INVALIDOS');
+  await rechaza(soc.crearReto(S.ADMIN, { ...base, fecha_fin: clock.addDays(hoy, 200) }), 'DATOS_INVALIDOS');
 });
 test('listarRetos separa activos, disponibles y completados', async () => {
   const r = await soc.listarRetos(S.ANA);
@@ -178,13 +178,13 @@ test('squad: al salir el lider, el liderazgo pasa al miembro con mas XP; si qued
   assert.equal(await one('SELECT id FROM squads WHERE id=2'), null);
   await rechaza(soc.salirSquad(S.VALE), 'SIN_SQUAD');
 });
-test('squad: detalle visible para miembros y docente del curso; el codigo solo para miembros', async () => {
+test('squad: detalle visible para miembros y admin; el codigo solo para miembros', async () => {
   const m = await soc.detalleSquad(S.LUIS, 1);
   assert.equal(m.miembros.length, 4); assert.ok(m.codigo_invitacion);
   assert.equal(m.miembros[0].id, 3); // ordenados por XP
   assert.equal(m.miembros.find((x) => x.id === 6).racha, 0); // Andres tiene la racha rota
   assert.ok(m.feed.length > 0 && typeof m.feed[0].detalle === 'object');
-  const d = await soc.detalleSquad(S.DOCENTE, 1);
+  const d = await soc.detalleSquad(S.ADMIN, 1);
   assert.equal(d.codigo_invitacion, undefined);
   await rechaza(soc.detalleSquad(S.VALE, 1), 'PROHIBIDO');
   await rechaza(soc.detalleSquad(S.ANA, 999), 'SQUAD_NO_ENCONTRADO');
@@ -208,7 +208,7 @@ test('ranking XP: orden, puestos, es_yo y filtro por squad con permisos', async 
   const sq = await soc.rankingXp(S.ANA, { squadId: 1 });
   assert.equal(sq.length, 4);
   await rechaza(soc.rankingXp(S.VALE, { squadId: 1 }), 'PROHIBIDO');
-  assert.equal((await soc.rankingXp(S.DOCENTE, { squadId: 1 })).length, 4);
+  assert.equal((await soc.rankingXp(S.ADMIN, { squadId: 1 })).length, 4);
 });
 test('ranking por ejercicio: ordena por total y calcula la tendencia semanal', async () => {
   const r = await soc.rankingEjercicio(S.ANA, 1);

@@ -17,9 +17,8 @@ async function crearSquad(actor, { nombre, descripcion = null } = {}) {
     if (await H.squadDe(actor.id, t)) throw E.conflict('Ya perteneces a un squad. Sal de el antes de crear otro', 'YA_TIENE_SQUAD');
     let codigo;
     do { codigo = codigoAleatorio(); } while (await one('SELECT 1 AS ok FROM squads WHERE codigo_invitacion=:c', { c: codigo }, t));
-    const curso = await one('SELECT curso_id FROM curso_estudiantes WHERE estudiante_id=:e ORDER BY inscrito_at LIMIT 1', { e: actor.id }, t);
-    const id = await insert('INSERT INTO squads (nombre,descripcion,codigo_invitacion,lider_id,curso_id) VALUES (:n,:d,:c,:l,:cu)',
-      { n: nombre.trim(), d: descripcion, c: codigo, l: actor.id, cu: curso ? curso.curso_id : null }, t);
+    const id = await insert('INSERT INTO squads (nombre,descripcion,codigo_invitacion,lider_id) VALUES (:n,:d,:c,:l)',
+      { n: nombre.trim(), d: descripcion, c: codigo, l: actor.id }, t);
     await run(`INSERT INTO squad_miembros (squad_id,estudiante_id,rol) VALUES (:s,:e,'lider')`, { s: id, e: actor.id }, t);
     const ins = await H.otorgarInsignia(actor.id, 'SQUAD_FUNDADOR', t);
     if (ins) await H.notificar(actor.id, 'insignia', `Nueva insignia: ${ins.nombre}`, ins.descripcion, t);
@@ -75,7 +74,6 @@ async function salirSquad(actor) {
 
 async function puedeVerSquad(actor, squad) {
   if (actor.rol === 'admin') return true;
-  if (actor.rol === 'docente') return !!(squad.curso_id && await one('SELECT 1 AS ok FROM cursos WHERE id=:c AND docente_id=:d', { c: squad.curso_id, d: actor.id }));
   return !!(await one('SELECT 1 AS ok FROM squad_miembros WHERE squad_id=:s AND estudiante_id=:e', { s: squad.id, e: actor.id }));
 }
 

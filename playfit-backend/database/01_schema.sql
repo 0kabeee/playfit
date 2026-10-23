@@ -7,7 +7,7 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
-DROP TABLE IF EXISTS intentos_login;
+DROP TABLE IF EXISTS intentos_login, codigos_verificacion, codigos_respaldo_2fa;
 DROP VIEW  IF EXISTS v_reps_semanales;
 DROP VIEW  IF EXISTS v_ranking_ejercicio;
 DROP VIEW  IF EXISTS v_ranking_xp;
@@ -19,7 +19,7 @@ DROP TABLE IF EXISTS ia_uso_diario, mensajes_ia, conversaciones_ia,
   series_ejercicio, sesiones_entrenamiento, squad_miembros, squads,
   ejercicio_contraindicaciones, ejercicios,
   mediciones_corporales, estudiante_flags, flags_clinicos, historiales_clinicos,
-  auditoria_accesos, curso_estudiantes, cursos, consentimientos,
+  auditoria_accesos, consentimientos,
   refresh_tokens, usuarios, roles;
 
 SET FOREIGN_KEY_CHECKS = 1;
@@ -29,7 +29,7 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- =====================================================================
 CREATE TABLE roles (
   id      TINYINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-  nombre  ENUM('estudiante','docente','admin') NOT NULL UNIQUE
+  nombre  ENUM('estudiante','admin') NOT NULL UNIQUE
 ) ENGINE=InnoDB;
 
 CREATE TABLE usuarios (
@@ -63,30 +63,14 @@ CREATE TABLE refresh_tokens (
 CREATE TABLE consentimientos (
   id              INT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   usuario_id      INT UNSIGNED NOT NULL,
-  tipo            ENUM('tratamiento_datos','datos_salud','uso_camara','ia_chatbot') NOT NULL,
+  tipo            ENUM('tratamiento_datos','datos_salud','uso_camara','ia_chatbot','mayoria_edad') NOT NULL,
   aceptado        TINYINT(1)   NOT NULL,
   version_politica VARCHAR(10) NOT NULL DEFAULT '1.0',
+  texto_hash      CHAR(64)     NULL,                    -- SHA-256 del texto exacto que la persona vio
+  ip              VARCHAR(45)  NULL,
   fecha           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_cons_usuario_tipo (usuario_id, tipo),
   CONSTRAINT fk_cons_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
-
-CREATE TABLE cursos (
-  id          INT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-  nombre      VARCHAR(120) NOT NULL,
-  periodo     VARCHAR(10)  NOT NULL,                    -- ej. 2026-2
-  docente_id  INT UNSIGNED NOT NULL,
-  activo      TINYINT(1)   NOT NULL DEFAULT 1,
-  CONSTRAINT fk_cursos_docente FOREIGN KEY (docente_id) REFERENCES usuarios(id)
-) ENGINE=InnoDB;
-
-CREATE TABLE curso_estudiantes (
-  curso_id       INT UNSIGNED NOT NULL,
-  estudiante_id  INT UNSIGNED NOT NULL,
-  inscrito_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (curso_id, estudiante_id),
-  CONSTRAINT fk_ce_curso FOREIGN KEY (curso_id) REFERENCES cursos(id) ON DELETE CASCADE,
-  CONSTRAINT fk_ce_est   FOREIGN KEY (estudiante_id) REFERENCES usuarios(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 -- Bitácora de accesos a datos sensibles (historial clínico)
@@ -130,7 +114,7 @@ CREATE TABLE flags_clinicos (
 CREATE TABLE estudiante_flags (
   estudiante_id  INT UNSIGNED NOT NULL,
   flag_codigo    VARCHAR(40)  NOT NULL,
-  origen         ENUM('estudiante','docente','sistema') NOT NULL DEFAULT 'sistema',
+  origen         ENUM('estudiante','sistema') NOT NULL DEFAULT 'sistema',
   derivado_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (estudiante_id, flag_codigo),
   CONSTRAINT fk_ef_est  FOREIGN KEY (estudiante_id) REFERENCES usuarios(id) ON DELETE CASCADE,
@@ -180,11 +164,9 @@ CREATE TABLE squads (
   descripcion        VARCHAR(200) NULL,
   codigo_invitacion  CHAR(8) NOT NULL UNIQUE,
   lider_id           INT UNSIGNED NOT NULL,
-  curso_id           INT UNSIGNED NULL,
   max_miembros       TINYINT UNSIGNED NOT NULL DEFAULT 6,
   created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_sq_lider FOREIGN KEY (lider_id) REFERENCES usuarios(id),
-  CONSTRAINT fk_sq_curso FOREIGN KEY (curso_id) REFERENCES cursos(id) ON DELETE SET NULL
+  CONSTRAINT fk_sq_lider FOREIGN KEY (lider_id) REFERENCES usuarios(id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE squad_miembros (
@@ -237,7 +219,7 @@ CREATE TABLE retos (
   id            INT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   titulo        VARCHAR(100) NOT NULL,
   descripcion   VARCHAR(255) NOT NULL,
-  tipo          ENUM('individual','squad','curso') NOT NULL,
+  tipo          ENUM('individual','squad') NOT NULL,
   metrica       ENUM('reps','sesiones','dias_activos') NOT NULL,
   ejercicio_id  INT UNSIGNED NULL,                      -- solo si metrica = reps
   meta          INT UNSIGNED NOT NULL,

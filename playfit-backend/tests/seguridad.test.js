@@ -61,7 +61,7 @@ test('tokens: una cuenta eliminada ya no puede usar su token', async () => {
 
 test('registro: contrasena de mas de 72 bytes (acentos cuentan doble) se rechaza con mensaje claro', async () => {
   const r = await http('POST', '/api/auth/register', { body: {
-    nombre: 'Nuevo', apellido: 'Usuario', email: 'largo@playfit.test', password: 'á'.repeat(40) + '1', consentimientos: { tratamiento_datos: true } } });
+    nombre: 'Nuevo', apellido: 'Usuario', email: 'largo@playfit.test', password: 'á'.repeat(40) + '1', consentimientos: { tratamiento_datos: true, mayoria_edad: true } } });
   assert.equal(r.status, 400); assert.equal(codigo(r), 'PASSWORD_DEBIL');
 });
 

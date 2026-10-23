@@ -145,8 +145,6 @@ String tipoRetoLabel(String tipo) {
   switch (tipo) {
     case 'squad':
       return 'Reto de squad';
-    case 'curso':
-      return 'Reto del curso';
     default:
       return 'Reto individual';
   }

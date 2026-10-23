@@ -9,7 +9,7 @@ const rechaza = (p, code) => assert.rejects(p, (e) => { assert.equal(e.code, cod
 
 test('registro exitoso crea usuario, consentimientos y tokens', async () => {
   const r = await auth.registrarEstudiante({ nombre: 'Nuevo', apellido: 'Usuario', email: 'Nuevo@Test.com', password: 'Clave1234', codigo_estudiantil: 'EST9999',
-    consentimientos: { tratamiento_datos: true, datos_salud: true, ia_chatbot: false } });
+    consentimientos: { tratamiento_datos: true, mayoria_edad: true, datos_salud: true, ia_chatbot: false } });
   assert.equal(r.usuario.email, 'nuevo@test.com');
   assert.equal(r.usuario.rol, 'estudiante');
   assert.ok(r.accessToken && r.refreshToken);
@@ -19,11 +19,13 @@ test('registro exitoso crea usuario, consentimientos y tokens', async () => {
   assert.match(fila.password_hash, /^\$2[aby]\$/); // bcrypt, nunca texto plano
 });
 test('registro rechaza correo repetido, password debil, sin consentimiento y correo invalido', async () => {
-  const base = { nombre: 'Ana', apellido: 'Xx', email: 'otro@test.com', password: 'Clave1234', consentimientos: { tratamiento_datos: true } };
+  const base = { nombre: 'Ana', apellido: 'Xx', email: 'otro@test.com', password: 'Clave1234', consentimientos: { tratamiento_datos: true, mayoria_edad: true } };
   await rechaza(auth.registrarEstudiante({ ...base, email: 'ana@playfit.test' }), 'EMAIL_EN_USO');
   await rechaza(auth.registrarEstudiante({ ...base, password: 'corta1' }), 'PASSWORD_DEBIL');
   await rechaza(auth.registrarEstudiante({ ...base, password: 'sololetrasss' }), 'PASSWORD_DEBIL');
   await rechaza(auth.registrarEstudiante({ ...base, consentimientos: {} }), 'CONSENTIMIENTO_REQUERIDO');
+  await rechaza(auth.registrarEstudiante({ ...base, consentimientos: { tratamiento_datos: true } }), 'EDAD_REQUERIDA');
+  await rechaza(auth.registrarEstudiante({ ...base, consentimientos: { tratamiento_datos: true, mayoria_edad: false } }), 'EDAD_REQUERIDA');
   await rechaza(auth.registrarEstudiante({ ...base, email: 'no-es-correo' }), 'EMAIL_INVALIDO');
   await rechaza(auth.registrarEstudiante({ ...base, codigo_estudiantil: '20231001' }), 'CODIGO_EN_USO');
 });
@@ -70,12 +72,13 @@ test('cambiar password exige la actual y revoca sesiones', async () => {
   await rechaza(auth.refrescar(a.refreshToken), 'TOKEN_REUTILIZADO');
   await auth.login('valentina@playfit.test', 'Nueva12345');
 });
-test('RBAC: solo admin crea staff; docente/estudiante no', async () => {
-  const d = await auth.crearUsuarioStaff(S.ADMIN, { rol: 'docente', nombre: 'Pedro', apellido: 'Gomez', email: 'pedro@playfit.test', password: 'Docente123' });
-  assert.equal(d.rol, 'docente');
-  await rechaza(auth.crearUsuarioStaff(S.DOCENTE, { rol: 'docente', nombre: 'X', apellido: 'Y', email: 'x@y.com', password: 'Docente123' }), 'PROHIBIDO');
-  await rechaza(auth.crearUsuarioStaff(S.ANA, { rol: 'admin', nombre: 'X', apellido: 'Y', email: 'x@y.com', password: 'Docente123' }), 'PROHIBIDO');
+test('RBAC: solo admin crea cuentas de admin; no existe el rol docente', async () => {
+  const d = await auth.crearUsuarioStaff(S.ADMIN, { rol: 'admin', nombre: 'Pedro', apellido: 'Gomez', email: 'pedro@playfit.test', password: 'Admin12345' });
+  assert.equal(d.rol, 'admin');
+  await rechaza(auth.crearUsuarioStaff(S.ADMIN, { rol: 'docente', nombre: 'X', apellido: 'Y', email: 'x@y.com', password: 'Admin12345' }), 'DATOS_INVALIDOS');
+  await rechaza(auth.crearUsuarioStaff(S.ANA, { rol: 'admin', nombre: 'X', apellido: 'Y', email: 'x@y.com', password: 'Admin12345' }), 'PROHIBIDO');
   await rechaza(auth.cambiarEstadoUsuario(S.ADMIN, 1, false), 'DATOS_INVALIDOS'); // no puede desactivarse a si mismo
-  assert.equal(rbac.can('admin', 'clinico:leer_curso'), false);
-  assert.equal(rbac.can('docente', 'reto:crear'), true);
+  assert.equal(rbac.can('admin', 'clinico:leer_propio'), false);
+  assert.equal(rbac.can('admin', 'reto:crear'), true);
+  assert.equal(rbac.can('docente', 'reto:crear'), false);
 });

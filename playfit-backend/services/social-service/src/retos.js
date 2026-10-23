@@ -2,7 +2,7 @@
 const { one, select, insert, run, tx, E, rbac, clock } = require('@playfit/shared');
 const H = require('./helpers');
 
-const TIPOS = ['individual', 'squad', 'curso'];
+const TIPOS = ['individual', 'squad'];
 const METRICAS = ['reps', 'sesiones', 'dias_activos'];
 
 async function crearReto(actor, d = {}) {
@@ -143,4 +143,21 @@ async function listarRetos(actor) {
   return { activos, disponibles, completados };
 }
 
-module.exports = { crearReto, unirseReto, listarRetos, actualizarRetosDelEstudiante, evaluarParticipacion, progresoReto };
+// ---- administracion de retos oficiales (solo admin) ----
+async function listarRetosAdmin(actor) {
+  rbac.requirePermiso(actor, 'reto:crear');
+  return select(
+    `SELECT r.id, r.titulo, r.descripcion, r.tipo, r.metrica, e.nombre AS ejercicio, r.meta, r.xp_recompensa,
+            r.fecha_inicio, r.fecha_fin, r.activo,
+            (SELECT COUNT(*) FROM reto_participaciones p WHERE p.reto_id=r.id) AS participantes,
+            (SELECT COUNT(*) FROM reto_participaciones p WHERE p.reto_id=r.id AND p.completado_at IS NOT NULL) AS completados
+     FROM retos r LEFT JOIN ejercicios e ON e.id=r.ejercicio_id ORDER BY r.activo DESC, r.fecha_fin DESC, r.id DESC LIMIT 200`);
+}
+async function cambiarEstadoReto(actor, retoId, activo) {
+  rbac.requirePermiso(actor, 'reto:crear');
+  if (typeof activo !== 'boolean') throw E.badRequest('"activo" debe ser true o false');
+  if (!(await one('SELECT id FROM retos WHERE id=:id', { id: retoId }))) throw E.notFound('Reto no encontrado');
+  await run('UPDATE retos SET activo=:a WHERE id=:id', { a: activo ? 1 : 0, id: retoId });
+}
+
+module.exports = { listarRetosAdmin, cambiarEstadoReto, crearReto, unirseReto, listarRetos, actualizarRetosDelEstudiante, evaluarParticipacion, progresoReto };

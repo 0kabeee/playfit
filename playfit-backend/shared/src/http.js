@@ -29,7 +29,7 @@ async function authenticate(req, res, next) {
   try {
     const u = await db.one('SELECT u.activo, r.nombre AS rol FROM usuarios u JOIN roles r ON r.id = u.rol_id WHERE u.id = :id', { id: Number(p.sub) });
     if (!u) return next(E.unauthorized('La cuenta ya no existe', 'TOKEN_INVALIDO'));
-    if (!u.activo) return next(E.unauthorized('Cuenta desactivada', 'CUENTA_INACTIVA'));
+    if (!u.activo || !['estudiante', 'admin'].includes(u.rol)) return next(E.unauthorized('Cuenta desactivada', 'CUENTA_INACTIVA'));
     req.actor = { id: Number(p.sub), rol: u.rol };
     return next();
   } catch (e) {

@@ -4,7 +4,6 @@ const { one, select, insert, run, tx, E, rbac, audit, crypto, clock } = require(
 
 // ---------- reglas de derivacion de flags (palabra clave -> flag) ----------
 // Criterio conservador: ante la duda se marca el flag (un falso positivo es mas seguro que un falso negativo).
-// El docente puede corregir/confirmar con fijarFlagsDocente().
 const REGLAS_FLAGS = [
   { flag: 'LESION_RODILLA', re: /rodilla|menisco|ligamento cruzado|\blca\b|rotula|condromalacia/ },
   { flag: 'LESION_HOMBRO', re: /hombro|manguito|luxacion de hombro|clavicula/ },
@@ -22,21 +21,12 @@ function derivarFlags(...textos) {
 }
 
 // ---------- autorizacion ----------
-// Acceso a datos de un estudiante: el propio estudiante, o un docente que tenga a ese estudiante en alguno de sus cursos.
-// El admin NO accede a datos clinicos.
+// Acceso a datos clinicos: SOLO el propio usuario. Ni el admin ni nadie mas (minimizacion de datos, Ley 1581).
 async function autorizar(actor, estudianteId, { escribir = false } = {}) {
   if (!actor) throw E.unauthorized();
   if (actor.rol === 'estudiante') {
     if (actor.id !== estudianteId) throw E.forbidden('Solo puedes acceder a tu propia informacion clinica');
     rbac.requirePermiso(actor, escribir ? 'clinico:escribir_propio' : 'clinico:leer_propio');
-    return;
-  }
-  if (actor.rol === 'docente') {
-    rbac.requirePermiso(actor, escribir ? 'clinico:escribir_curso' : 'clinico:leer_curso');
-    const ok = await one(
-      `SELECT 1 AS ok FROM cursos c JOIN curso_estudiantes ce ON ce.curso_id=c.id
-       WHERE c.docente_id=:d AND ce.estudiante_id=:e AND c.activo=1 LIMIT 1`, { d: actor.id, e: estudianteId });
-    if (!ok) throw E.forbidden('Ese estudiante no pertenece a tus cursos');
     return;
   }
   throw E.forbidden('Tu rol no tiene acceso a datos clinicos');
@@ -79,13 +69,12 @@ async function guardarHistorial(actor, estudianteId, { fecha_nacimiento = null, 
          condiciones_cifrado=VALUES(condiciones_cifrado), lesiones_cifrado=VALUES(lesiones_cifrado),
          medicamentos_cifrado=VALUES(medicamentos_cifrado), actualizado_por=VALUES(actualizado_por)`,
       { e: estudianteId, fn: fecha_nacimiento, c: crypto.encrypt(cond), l: crypto.encrypt(les), m: crypto.encrypt(med), a: actor.id }, t);
-    // Se recalculan los flags 'sistema'; los fijados por un docente se conservan.
+    // Se recalculan los flags derivados del historial.
     await run(`DELETE FROM estudiante_flags WHERE estudiante_id=:e AND origen IN ('sistema','estudiante')`, { e: estudianteId }, t);
     const origen = actor.rol === 'estudiante' ? 'estudiante' : 'sistema';
     for (const f of flags) {
       await run('INSERT IGNORE INTO estudiante_flags (estudiante_id,flag_codigo,origen) VALUES (:e,:f,:o)', { e: estudianteId, f, o: origen }, t);
     }
-    // Si ya hay flags de docente con restricciones reales, SIN_RESTRICCIONES se quita para no contradecirlos.
     await limpiarSinRestricciones(estudianteId, t);
     await audit.registrar(actor, 'actualizar', 'historial_clinico', estudianteId, { ip, t });
     return { estudiante_id: estudianteId, flags: await flagsDe(estudianteId, t) };
@@ -125,25 +114,6 @@ async function obtenerFlags(actor, estudianteId, { ip } = {}) {
 // Uso interno entre servicios (IA, social): devuelve SOLO codigos de flags.
 async function obtenerCodigosFlagsInterno(estudianteId) {
   return (await flagsDe(estudianteId)).map((f) => f.codigo);
-}
-
-async function fijarFlagsDocente(actor, estudianteId, codigos, { ip } = {}) {
-  if (!actor || actor.rol !== 'docente') throw E.forbidden('Solo un docente puede fijar flags manualmente');
-  await autorizar(actor, estudianteId, { escribir: true });
-  if (!Array.isArray(codigos) || codigos.length === 0) throw E.badRequest('Indica al menos un flag', 'DATOS_INVALIDOS');
-  const validos = (await select('SELECT codigo FROM flags_clinicos')).map((f) => f.codigo);
-  const malos = codigos.filter((c) => !validos.includes(c));
-  if (malos.length) throw E.badRequest(`Flags desconocidos: ${malos.join(', ')}`, 'FLAG_INVALIDO');
-  return tx(async (t) => {
-    // La decision del docente reemplaza lo derivado automaticamente.
-    await run('DELETE FROM estudiante_flags WHERE estudiante_id=:e', { e: estudianteId }, t);
-    for (const f of new Set(codigos)) {
-      await run(`INSERT INTO estudiante_flags (estudiante_id,flag_codigo,origen) VALUES (:e,:f,'docente')`, { e: estudianteId, f }, t);
-    }
-    await limpiarSinRestricciones(estudianteId, t);
-    await audit.registrar(actor, 'actualizar', 'flags_clinicos', estudianteId, { ip, t });
-    return flagsDe(estudianteId, t);
-  });
 }
 
 // ---------- mediciones corporales ----------
@@ -189,5 +159,5 @@ async function ejerciciosParaEstudiante(estudianteId) {
 
 module.exports = {
   derivarFlags, categoriaIMC, guardarHistorial, leerHistorial, obtenerFlags, obtenerCodigosFlagsInterno,
-  fijarFlagsDocente, registrarMedicion, listarMediciones, ejerciciosParaEstudiante, REGLAS_FLAGS
+  registrarMedicion, listarMediciones, ejerciciosParaEstudiante, REGLAS_FLAGS
 };

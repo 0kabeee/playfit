@@ -1,11 +1,19 @@
-// Aplica los cambios de esquema idempotentes de la Fase 7 (tabla intentos_login) sobre una base ya existente.
+// Aplica las migraciones idempotentes (03_fase7 y 04_fase11) sobre una base ya existente.
 const fs = require('fs');
 const path = require('path');
 const db = require('./db');
 
-async function aplicar() {
-  const archivo = path.join(__dirname, '..', '..', 'database', '03_fase7.sql');
-  const sql = fs.readFileSync(archivo, 'utf8').split(/\r?\n/).filter((l) => !l.trim().startsWith('--')).join('\n').trim();
-  await db.sequelize.query(sql);
+const ARCHIVOS = ['03_fase7.sql', '04_fase11.sql'];
+
+// Parte un archivo .sql en sentencias (los archivos de migracion no tienen ';' dentro de textos).
+function sentencias(texto) {
+  return texto.split(/\r?\n/).filter((l) => !l.trim().startsWith('--')).join('\n')
+    .split(/;\s*(?:\n|$)/).map((s) => s.trim()).filter(Boolean);
 }
-module.exports = { aplicar };
+async function aplicar() {
+  for (const a of ARCHIVOS) {
+    const sql = fs.readFileSync(path.join(__dirname, '..', '..', 'database', a), 'utf8');
+    for (const s of sentencias(sql)) await db.sequelize.query(s);
+  }
+}
+module.exports = { aplicar, sentencias, ARCHIVOS };

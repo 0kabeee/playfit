@@ -75,7 +75,7 @@ test('gateway: CORS solo para origenes autorizados', async () => {
 
 // ================= autenticacion por HTTP =================
 test('auth: registro -> /me -> refresh con rotacion -> reuso detectado -> logout', async () => {
-  const reg = await http('POST', '/api/auth/register', { body: { nombre: 'Laura', apellido: 'Rios', email: 'laura@playfit.test', password: 'Clave12345', consentimientos: { tratamiento_datos: true } } });
+  const reg = await http('POST', '/api/auth/register', { body: { nombre: 'Laura', apellido: 'Rios', email: 'laura@playfit.test', password: 'Clave12345', consentimientos: { tratamiento_datos: true, mayoria_edad: true } } });
   assert.equal(reg.status, 201); assert.equal(reg.body.usuario.rol, 'estudiante');
   const me = await http('GET', '/api/auth/me', { token: reg.body.accessToken });
   assert.equal(me.status, 200); assert.equal(me.body.email, 'laura@playfit.test');
@@ -89,7 +89,7 @@ test('auth: registro -> /me -> refresh con rotacion -> reuso detectado -> logout
   assert.equal(out.status, 204);
 });
 test('auth: errores de validacion y credenciales con codigos estables', async () => {
-  const debil = await http('POST', '/api/auth/register', { body: { nombre: 'Ana', apellido: 'Lopez', email: 'x@y.com', password: '123', consentimientos: { tratamiento_datos: true } } });
+  const debil = await http('POST', '/api/auth/register', { body: { nombre: 'Ana', apellido: 'Lopez', email: 'x@y.com', password: '123', consentimientos: { tratamiento_datos: true, mayoria_edad: true } } });
   assert.equal(debil.status, 400); assert.equal(codigo(debil), 'PASSWORD_DEBIL');
   const mala = await http('POST', '/api/auth/login', { body: { email: 'ana@playfit.test', password: 'mala' } });
   assert.equal(mala.status, 401); assert.equal(codigo(mala), 'CREDENCIALES_INVALIDAS');
@@ -111,16 +111,15 @@ test('seguridad: no se puede suplantar identidad con cabeceras y los servicios e
   assert.equal(directo.status, 401);
 });
 test('auth: consentimientos y administracion de usuarios segun el rol', async () => {
-  const ana = await login('ana@playfit.test'), admin = await login('admin@playfit.test'), doc = await login('docente@playfit.test');
+  const ana = await login('ana@playfit.test'), admin = await login('admin@playfit.test');
   const c = await http('PUT', '/api/auth/consents/ia_chatbot', { token: ana, body: { aceptado: false } });
   assert.equal(c.status, 200); assert.equal(c.body.ia_chatbot, false);
   assert.equal((await http('PUT', '/api/auth/consents/ia_chatbot', { token: ana, body: { aceptado: 'si' } })).status, 400);
   await http('PUT', '/api/auth/consents/ia_chatbot', { token: ana, body: { aceptado: true } });
   assert.equal((await http('GET', '/api/auth/users', { token: ana })).status, 403);
-  assert.equal((await http('GET', '/api/auth/users', { token: doc })).status, 403);
   const lista = await http('GET', '/api/auth/users', { token: admin });
   assert.equal(lista.status, 200); assert.ok(lista.body.length >= 8);
-  const nuevo = await http('POST', '/api/auth/users', { token: admin, body: { rol: 'docente', nombre: 'Rosa', apellido: 'Vega', email: 'rosa@playfit.test', password: 'Docente123' } });
+  const nuevo = await http('POST', '/api/auth/users', { token: admin, body: { rol: 'admin', nombre: 'Rosa', apellido: 'Vega', email: 'rosa@playfit.test', password: 'Docente123' } });
   assert.equal(nuevo.status, 201);
   assert.equal((await http('POST', '/api/auth/users', { token: ana, body: { rol: 'admin', nombre: 'Xx', apellido: 'Yy', email: 'z@z.com', password: 'Docente123' } })).status, 403);
   assert.equal((await http('PATCH', `/api/auth/users/${nuevo.body.id}`, { token: admin, body: { activo: false } })).status, 204);
@@ -146,7 +145,7 @@ test('social: flujo del estudiante (dashboard, sesion, historial, retos, ranking
   assert.ok(rt.body.completados.length >= 1);
 });
 test('social: validaciones y permisos por HTTP', async () => {
-  const t = await login('camila@playfit.test'), doc = await login('docente@playfit.test');
+  const t = await login('camila@playfit.test'), doc = await login('admin@playfit.test');
   const mala = await http('POST', '/api/social/sessions', { token: t, body: { ejercicios: [{ ejercicio_id: 1, series: [{ repeticiones: 0 }] }] } });
   assert.equal(mala.status, 400); assert.equal(codigo(mala), 'DATOS_INVALIDOS');
   assert.equal((await http('POST', '/api/social/sessions', { token: doc, body: { ejercicios: [{ ejercicio_id: 1, series: [{ repeticiones: 5 }] }] } })).status, 403);
@@ -157,11 +156,11 @@ test('social: validaciones y permisos por HTTP', async () => {
   const largo = await http('POST', '/api/social/challenges', { token: doc, body: base });
   assert.equal(largo.status, 400); // dura mas de 90 dias
 });
-test('social: el docente crea un reto y el estudiante se une', async () => {
-  const t = await login('sebastian@playfit.test'), doc = await login('docente@playfit.test');
+test('social: el admin crea un reto oficial y el usuario se une', async () => {
+  const t = await login('sebastian@playfit.test'), doc = await login('admin@playfit.test');
   const { clock } = require('@playfit/shared');
   const hoy = clock.hoy(), fin = clock.addDays(hoy, 10);
-  const c = await http('POST', '/api/social/challenges', { token: doc, body: { titulo: 'Reto del docente', descripcion: 'Entrena 5 dias', tipo: 'individual', metrica: 'dias_activos', meta: 5, fecha_inicio: hoy, fecha_fin: fin } });
+  const c = await http('POST', '/api/social/challenges', { token: doc, body: { titulo: 'Reto oficial', descripcion: 'Entrena 5 dias', tipo: 'individual', metrica: 'dias_activos', meta: 5, fecha_inicio: hoy, fecha_fin: fin } });
   assert.equal(c.status, 201, c.text);
   const j = await http('POST', `/api/social/challenges/${c.body.id}/join`, { token: t });
   assert.equal(j.status, 200); assert.equal(j.body.meta, 5);
@@ -169,7 +168,7 @@ test('social: el docente crea un reto y el estudiante se une', async () => {
   assert.equal(otra.status, 409); assert.equal(codigo(otra), 'YA_PARTICIPA');
 });
 test('social: crear squad, unirse por codigo, ver detalle, comparar y salir', async () => {
-  const reg = async (n) => (await http('POST', '/api/auth/register', { body: { nombre: n, apellido: 'Prueba', email: `${n.toLowerCase()}@squad.test`, password: 'Clave12345', consentimientos: { tratamiento_datos: true } } })).body;
+  const reg = async (n) => (await http('POST', '/api/auth/register', { body: { nombre: n, apellido: 'Prueba', email: `${n.toLowerCase()}@squad.test`, password: 'Clave12345', consentimientos: { tratamiento_datos: true, mayoria_edad: true } } })).body;
   const [a, b] = [await reg('Marta'), await reg('Pablo')];
   const sq = await http('POST', '/api/social/squads', { token: a.accessToken, body: { nombre: 'Los Probadores' } });
   assert.equal(sq.status, 201); assert.match(sq.body.codigo_invitacion, /^[A-Z2-9]{8}$/);
@@ -201,16 +200,13 @@ test('clinico: el estudiante guarda y lee su historial; flags derivados; todo au
   const aud = await select("SELECT ip FROM auditoria_accesos WHERE recurso='historial_clinico' AND recurso_id=7 AND accion='leer'");
   assert.ok(aud.length >= 1 && aud[0].ip, 'la auditoria debe guardar la IP del cliente');
 });
-test('clinico: permisos (otro estudiante, docente del curso, admin) y mediciones', async () => {
-  const luis = await login('luis@playfit.test'), doc = await login('docente@playfit.test'), admin = await login('admin@playfit.test'), vale = await login('valentina@playfit.test');
+test('clinico: permisos (otro usuario, admin) y mediciones', async () => {
+  const luis = await login('luis@playfit.test'), admin = await login('admin@playfit.test'), vale = await login('valentina@playfit.test');
   assert.equal((await http('GET', '/api/clinical/students/7/history', { token: luis })).status, 403);
   assert.equal((await http('GET', '/api/clinical/students/7/history', { token: admin })).status, 403);
-  assert.equal((await http('GET', '/api/clinical/students/7/history', { token: doc })).status, 200);
-  assert.equal((await http('GET', '/api/clinical/students/xyz/history', { token: doc })).status, 400);
+  assert.equal((await http('GET', '/api/clinical/students/xyz/history', { token: admin })).status, 400);
   assert.equal((await http('GET', '/api/clinical/students/7/history')).status, 401);
-  const f = await http('PUT', '/api/clinical/students/7/flags', { token: doc, body: { codigos: ['LESION_HOMBRO'] } });
-  assert.equal(f.status, 200); assert.equal(f.body[0].origen, 'docente');
-  assert.equal((await http('PUT', '/api/clinical/students/7/flags', { token: vale, body: { codigos: ['LESION_HOMBRO'] } })).status, 403);
+  assert.equal((await http('PUT', '/api/clinical/students/7/flags', { token: vale, body: { codigos: ['LESION_HOMBRO'] } })).status, 404); // los flags ya no se fijan a mano
   const m = await http('POST', '/api/clinical/students/me/measurements', { token: vale, body: { peso_kg: 58, estatura_cm: 163 } });
   assert.equal(m.status, 201); assert.equal(m.body.categoria_imc, 'normal');
   assert.equal((await http('POST', '/api/clinical/students/me/measurements', { token: vale, body: { peso_kg: 5, estatura_cm: 163 } })).status, 400);
@@ -228,8 +224,8 @@ test('contenido: ejercicios, detalle, tip, nutricion', async () => {
   assert.ok((await http('GET', '/api/content/exercises/1/tip', { token: t })).body.tip);
   assert.equal((await http('GET', '/api/content/nutrition?category=hidratacion', { token: t })).body.length, 1);
 });
-test('mascota por HTTP: mensaje segun datos reales y AUSENTE en pantallas clinicas o para docentes', async () => {
-  const t = await login('ana@playfit.test'), doc = await login('docente@playfit.test');
+test('mascota por HTTP: mensaje segun datos reales y AUSENTE en pantallas clinicas o para el admin', async () => {
+  const t = await login('ana@playfit.test'), doc = await login('admin@playfit.test');
   const ok = await http('GET', '/api/content/mascot?context=racha&racha=12&pantalla=dashboard', { token: t });
   assert.equal(ok.body.mensaje.pose, 'yeah');
   const clin = await http('GET', '/api/content/mascot?context=racha&racha=12&pantalla=historial_clinico', { token: t });
@@ -315,7 +311,7 @@ test('app: detalle de reto (participantes solo del propio squad) y resumen de sq
 test('app: eliminar cuenta exige la contrasena, borra los datos y traspasa el liderazgo', async () => {
   const luis = await login('luis@playfit.test');
   assert.equal(codigo(await http('DELETE', '/api/auth/me', { token: luis, body: { password: 'mala' } })), 'CREDENCIALES_INVALIDAS');
-  assert.equal((await http('DELETE', '/api/auth/me', { token: await login('docente@playfit.test'), body: { password: 'PlayFit123!' } })).status, 403);
+  assert.equal((await http('DELETE', '/api/auth/me', { token: await login('admin@playfit.test'), body: { password: 'PlayFit123!' } })).status, 403);
   // Luis (id 4) es miembro; Ana (3) lidera el squad 1. Borramos a Ana: el liderazgo pasa a quien tenga mas XP (Luis).
   const ana = await login('ana@playfit.test');
   const del = await http('DELETE', '/api/auth/me', { token: ana, body: { password: 'PlayFit123!' } });

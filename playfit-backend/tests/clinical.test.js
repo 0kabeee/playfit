@@ -40,28 +40,10 @@ test('un estudiante NO puede leer ni escribir el historial de otro; admin tampoc
   await rechaza(clin.leerHistorial(S.ADMIN, 3), 'PROHIBIDO');
   await rechaza(clin.obtenerFlags(S.ADMIN, 3), 'PROHIBIDO');
 });
-test('docente accede solo a estudiantes de SUS cursos', async () => {
-  const h = await clin.leerHistorial(S.DOCENTE, 3);
-  assert.equal(h.lesiones, 'Esguince de rodilla en 2024');
-  const { sequelize } = require('@playfit/shared');
-  await sequelize.query("INSERT INTO usuarios (id,rol_id,nombre,apellido,email,password_hash) VALUES (20,2,'Otro','Docente','otro.doc@playfit.test','x')");
-  await rechaza(clin.leerHistorial(S.actor(20, 'docente'), 3), 'PROHIBIDO');
-});
 test('cada lectura/escritura clinica queda en la bitacora de auditoria', async () => {
   const filas = await select("SELECT usuario_id,accion FROM auditoria_accesos WHERE recurso='historial_clinico' AND recurso_id=3 ORDER BY id");
   assert.ok(filas.some((f) => f.usuario_id === 3 && f.accion === 'actualizar'));
   assert.ok(filas.some((f) => f.usuario_id === 3 && f.accion === 'leer'));
-  assert.ok(filas.some((f) => f.usuario_id === 2 && f.accion === 'leer'));
-});
-test('el docente puede fijar flags manualmente y estos sobreviven a recalculos automaticos', async () => {
-  await rechaza(clin.fijarFlagsDocente(S.DOCENTE, 3, ['NO_EXISTE']), 'FLAG_INVALIDO');
-  await rechaza(clin.fijarFlagsDocente(S.ANA, 3, ['LESION_HOMBRO']), 'PROHIBIDO');
-  const f = await clin.fijarFlagsDocente(S.DOCENTE, 3, ['LESION_HOMBRO']);
-  assert.deepEqual(f.map((x) => [x.codigo, x.origen]), [['LESION_HOMBRO', 'docente']]);
-  await clin.guardarHistorial(S.ANA, 3, { condiciones: 'ninguna' });
-  const despues = (await clin.obtenerCodigosFlagsInterno(3)).sort();
-  assert.ok(despues.includes('LESION_HOMBRO'), 'el flag del docente debe conservarse');
-  assert.ok(!despues.includes('SIN_RESTRICCIONES'), 'no debe contradecir una restriccion real');
 });
 test('mediciones: valida rangos, calcula IMC y variacion de peso', async () => {
   await rechaza(clin.registrarMedicion(S.ANA, 3, { peso_kg: 10, estatura_cm: 165 }), 'DATOS_INVALIDOS');

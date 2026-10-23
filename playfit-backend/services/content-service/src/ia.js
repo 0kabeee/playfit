@@ -11,7 +11,7 @@ const limiteDiario = () => Number(process.env.IA_LIMITE_DIARIO || 20);
 const SENALES_ALARMA = /dolor (fuerte )?(en el )?pecho|dolor de pecho|desmay|mareo (fuerte|intenso)|falta de aire|no puedo respirar|palpitaciones|vision borrosa|me duele (mucho|demasiado)|lesion grave/;
 const normalizar = (s) => String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 const detectarEmergencia = (texto) => SENALES_ALARMA.test(normalizar(texto));
-const MENSAJE_ALARMA = 'Lo que describes puede ser una senal de alerta. Deten el ejercicio, descansa y consulta con tu docente o un profesional de salud antes de seguir entrenando. Si es una emergencia, llama a la linea 123.';
+const MENSAJE_ALARMA = 'Lo que describes puede ser una senal de alerta. Deten el ejercicio, descansa y consulta con un profesional de salud antes de seguir entrenando. Si es una emergencia, llama a la linea 123.';
 
 async function construirSystemPrompt(estudianteId) {
   const flags = await select(
@@ -20,7 +20,7 @@ async function construirSystemPrompt(estudianteId) {
   const lineas = [
     'Eres el asistente de PlayFit, una app de entrenamiento para estudiantes universitarios.',
     'Das consejos generales de tecnica, rutinas basicas y habitos saludables, en espanol, en tono cercano y breve (maximo 120 palabras).',
-    'No eres medico: nunca diagnostiques, no recomiendes medicamentos ni dietas extremas. Si el estudiante menciona dolor persistente, sugiere hablar con su docente o un profesional de salud.',
+    'No eres medico: nunca diagnostiques, no recomiendes medicamentos ni dietas extremas. Si el usuario menciona dolor persistente, sugiere hablar con un profesional de salud.',
     'No inventes datos personales del estudiante.'
   ];
   if (flags.length) {

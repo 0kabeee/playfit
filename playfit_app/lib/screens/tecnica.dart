@@ -211,7 +211,7 @@ class TecnicaDetalleScreen extends StatelessWidget {
             const SizedBox(height: 12),
             if (asBool(data['restringido']))
               const PanelNote(
-                'Este ejercicio puede no ser el más adecuado según tus indicadores de salud. Consúltalo con tu docente antes de aumentar la carga.',
+                'Este ejercicio puede no ser el más adecuado según tus indicadores de salud. Consúltalo con un profesional de salud antes de aumentar la carga.',
                 icon: 'triangle-alert',
                 bg: C.yellowBg,
               ),
