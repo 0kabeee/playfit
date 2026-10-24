@@ -15,6 +15,18 @@ const limiteDiario = () => Number(process.env.IA_LIMITE_DIARIO || 20);
 const SENALES_ALARMA = /dolor (fuerte )?(en el )?pecho|dolor de pecho|desmay|mareo (fuerte|intenso)|falta de aire|no puedo respirar|palpitaciones|vision borrosa|me duele (mucho|demasiado)|lesion grave/;
 const normalizar = (s) => String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 const detectarEmergencia = (texto) => SENALES_ALARMA.test(normalizar(texto));
+
+// Red de seguridad: si el modelo dice que YA hizo algo que cambia datos pero no llamo a ninguna funcion que lo haga,
+// se corrige la respuesta (el servidor sabe lo que realmente paso, el modelo no siempre dice la verdad).
+const PROMESA_HECHA = /\b(ya|he|hemos|acabo de)\s+(lo\s+|la\s+|te\s+)?(registr|cre[eo]|elimin|borr|cambi|actualiz|envi|reset|restabl|desactiv|activ|cancel|acept|aprob|asign|sume|otorg)/;
+function corregirPromesas(respuesta, estado) {
+  if (typeof respuesta !== 'string' || !PROMESA_HECHA.test(normalizar(respuesta))) return respuesta;
+  const e = estado || {};
+  if (e.propuesta) return `${respuesta}\n\n(Ojo: todavia no esta guardado. Toca Confirmar en la tarjeta para que quede.)`;
+  if (e.memoria && e.memoria.length) return respuesta; // guardar preferencias si lo hace de verdad
+  if (e.transferir) return respuesta;
+  return `${respuesta}\n\n(Ojo: desde el chat no hice ningun cambio. Lo que puedo hacer es proponerte registrar una sesion o crear un reto del squad, guardar tus preferencias o pasarte con una persona del equipo.)`;
+}
 const MENSAJE_ALARMA = 'Lo que describes puede ser una senal de alerta. Deten el ejercicio, descansa y consulta con un profesional de salud antes de seguir entrenando. Si es una emergencia, llama a la linea 123.';
 
 const VALOR_LEGIBLE = (v) => String(v).replace(/_/g, ' ');
@@ -39,6 +51,13 @@ async function construirSystemPrompt(estudianteId, { hoy = clock.hoy(), catalogo
     '- guardar_preferencia cuando el usuario te diga su objetivo, experiencia, dias, horario, minutos por sesion o equipo.',
     '- Para rutinas usa SOLO ejercicios del catalogo y nunca los marcados EVITAR. Adapta la rutina a lo que recuerdas del usuario.',
     '- transferir_a_humano si pide una persona o tiene un problema de cuenta que no puedes resolver.',
+    '',
+    'LIMITES (obligatorios):',
+    '- Solo puedes hacer lo que hacen las funciones de arriba. No tienes ninguna otra capacidad.',
+    '- NO puedes: cambiar o recuperar contrasenas, borrar o modificar cuentas, unirte o sacar a alguien de un squad, crear o aceptar duelos, tocar el ranking, dar o quitar XP o insignias, procesar pagos, activar el Premium ni ver datos de otras personas.',
+    '- Si piden algo que no puedes hacer, dilo con claridad ("eso no lo puedo hacer desde el chat") e indica donde se hace en la app (Squad, Retos, Perfil > Cuenta) o ofrece transferir a una persona con transferir_a_humano. NUNCA finjas haberlo hecho.',
+    '- Nunca digas que hiciste algo si no llamaste a la funcion correspondiente. Registrar sesiones y crear retos solo se proponen: dilo asi.',
+    '- Si no sabes algo o esta fuera de entrenamiento, nutricion basica y habitos saludables, di que no tienes esa informacion en lugar de inventarla. No inventes cifras, nombres, fechas ni funciones de la app.',
     '',
     'Catalogo de ejercicios (slug: nombre, grupo, como se mide):'
   ];
@@ -115,6 +134,7 @@ async function chat(actor, { conversacionId = null, mensaje } = {}, { llm } = {}
         system, history: historial.map((h) => ({ role: h.rol, text: h.contenido })), userMessage: mensaje.trim(),
         tools: agente.FUNCIONES, ejecutarFuncion: ejecutor.ejecutar
       });
+      if (typeof respuesta === 'string' && respuesta.trim()) respuesta = corregirPromesas(respuesta, ejecutor.estado);
       if (typeof respuesta !== 'string' || !respuesta.trim()) {
         // el modelo pudo quedarse solo con la llamada a la funcion: se responde con el resumen
         const e = ejecutor.estado;
@@ -279,5 +299,5 @@ function crearClienteGemini({ apiKey = process.env.GEMINI_API_KEY, modelo = proc
 
 module.exports = {
   chat, listarConversaciones, verConversacion, resolverAccion, verMemoria, borrarMemoria,
-  crearClienteGemini, construirSystemPrompt, detectarEmergencia, MENSAJE_ALARMA
+  crearClienteGemini, construirSystemPrompt, detectarEmergencia, corregirPromesas, MENSAJE_ALARMA
 };

@@ -381,3 +381,19 @@ test('HTTP: API interna exige el token de n8n y el gateway no la expone; la app 
     await srv.cerrar();
   }
 });
+
+test('el agente no inventa acciones: el prompt fija limites y se corrige si dice que hizo algo sin hacerlo', async () => {
+  const system = await ia.construirSystemPrompt(4);
+  assert.match(system, /LIMITES \(obligatorios\)/);
+  assert.match(system, /NUNCA finjas haberlo hecho/);
+  assert.match(system, /No puedes|NO puedes/);
+
+  // dice que cambio la contrasena sin ninguna funcion: se aclara que no se hizo nada
+  const falso = ia.corregirPromesas('Listo, ya cambie tu contrasena.', { propuesta: null, memoria: [], transferir: null });
+  assert.match(falso, /no hice ningun cambio/);
+  // dice que ya registro la sesion pero solo hay una propuesta: se avisa que falta confirmar
+  assert.match(ia.corregirPromesas('Ya registre tu sesion.', { propuesta: { tipo: 'registrar_sesion' }, memoria: [] }), /todavia no esta guardado/);
+  // respuestas normales no se tocan
+  assert.equal(ia.corregirPromesas('Hoy llevas 1 sesion, sigue asi.', {}), 'Hoy llevas 1 sesion, sigue asi.');
+  assert.equal(ia.corregirPromesas('He guardado tus preferencias.', { memoria: [{ clave: 'objetivo' }] }), 'He guardado tus preferencias.');
+});
