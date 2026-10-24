@@ -70,12 +70,14 @@ class ApiClient {
     if (auth && accessToken != null) req.headers['Authorization'] = 'Bearer $accessToken';
     if (body != null) req.body = jsonEncode(body);
 
+    // El asistente de IA hace varias llamadas al modelo y puede tardar bastante mas que el resto de la API.
+    final lenta = path.contains('/ai/');
     http.Response res;
     try {
-      final streamed = await _client.send(req).timeout(const Duration(seconds: 15));
+      final streamed = await _client.send(req).timeout(Duration(seconds: lenta ? 70 : 15));
       res = await http.Response.fromStream(streamed);
     } on TimeoutException {
-      offline.value = true;
+      if (!lenta) offline.value = true; // una respuesta lenta de la IA no significa que no haya internet
       throw const ApiException(0, 'SIN_CONEXION', 'El servidor tardó demasiado en responder.');
     } on SocketException {
       offline.value = true;

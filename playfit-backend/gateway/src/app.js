@@ -75,8 +75,8 @@ function createGateway({
       target: targets[nombre],
       pathFilter: prefijo,
       xfwd: true,                  // el servicio ve la IP real del cliente (auditoria)
-      proxyTimeout: timeoutMs,
-      timeout: timeoutMs,
+      proxyTimeout: nombre === 'content' ? Math.max(timeoutMs, 60000) : timeoutMs, // la IA puede tardar mas
+      timeout: nombre === 'content' ? Math.max(timeoutMs, 60000) : timeoutMs,
       on: {
         error: (err, req, res) => {
           if (typeof res.writeHead !== 'function' || res.headersSent) return;

@@ -219,11 +219,18 @@ function crearClienteGemini({ apiKey = process.env.GEMINI_API_KEY, modelo = proc
   if (!apiKey) return null;
 
   async function llamar(body) {
-    const res = await fetchFn(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-      body: JSON.stringify(body)
-    });
+    let res;
+    try {
+      res = await fetchFn(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(20000)   // si Gemini no responde en 20 s se corta (el mensaje sigue siendo valido)
+      });
+    } catch (e) {
+      if (e && (e.name === 'TimeoutError' || e.name === 'AbortError')) throw new AppError(504, 'IA_LENTA', 'El asistente tardo demasiado en responder. Intenta de nuevo.');
+      throw e;
+    }
     if (res.status === 429) throw E.tooMany('El asistente esta saturado, intenta en un minuto', 'IA_SATURADA');
     // Problemas de configuracion del servidor (no del estudiante): se registran en la consola y se avisa con claridad.
     if (res.status === 404) {

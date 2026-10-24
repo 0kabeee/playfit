@@ -47,6 +47,10 @@ android {
 
     buildTypes {
         release {
+            // R8 recortaba la base de datos de WorkManager (la usa Firebase) y la app se cerraba al abrir.
+            // Sin recorte el APK pesa un poco mas, pero abre bien.
+            isMinifyEnabled = false
+            isShrinkResources = false
             signingConfig = if (keystorePropertiesFile.exists()) {
                 signingConfigs.getByName("release")
             } else {
