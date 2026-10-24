@@ -113,8 +113,9 @@ async function aplicarTransaccion(trx, origen) {
         { tx: String(trx.id), id: p.id }, t);
       return { resultado: 'monto_no_coincide', pago: p };
     }
+    // (Sequelize no reemplaza parametros dentro de IF(:x...): la fecha de pago se elige aqui, con texto fijo)
     await run(`UPDATE pagos SET estado=:e, transaccion_id=:tx, metodo=:m, actualizado_at=UTC_TIMESTAMP(),
-               pagado_at=IF(:e='aprobado', UTC_TIMESTAMP(), pagado_at) WHERE id=:id`,
+               pagado_at=${nuevo === 'aprobado' ? 'UTC_TIMESTAMP()' : 'pagado_at'} WHERE id=:id`,
       { e: nuevo, tx: String(trx.id), m: trx.payment_method_type ? String(trx.payment_method_type).slice(0, 30) : null, id: p.id }, t);
     if (nuevo === 'aprobado') {
       const hasta = await P.extender(p.usuario_id, p.dias, 'pago', { pagoId: p.id }, t);

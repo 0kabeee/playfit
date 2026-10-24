@@ -17,18 +17,25 @@ const BENEFICIOS = [
   'Ajuste automático de tu rutina cada semana según lo que entrenas (próximamente)'
 ];
 
-// 'YYYY-MM-DD HH:MM:SS' (UTC, asi llegan las fechas de la BD) -> Date
-const aFecha = (s) => (s ? new Date(`${String(s).replace(' ', 'T')}Z`) : null);
+// Fecha de la BD (UTC) -> Date. Acepta 'YYYY-MM-DD HH:MM:SS[.ffffff]', ISO o un Date (segun el driver). Invalida -> null.
+function aFecha(v) {
+  if (!v) return null;
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : v;
+  const s = String(v).trim();
+  const m = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})/.exec(s);
+  const d = m ? new Date(`${m[1]}T${m[2]}Z`) : new Date(s);
+  return Number.isNaN(d.getTime()) || d.getUTCFullYear() < 1971 ? null : d;
+}
 const activo = (hasta, ahora = Date.now()) => { const d = aFecha(hasta); return !!d && d.getTime() > ahora; };
-const iso = (hasta) => (hasta ? aFecha(hasta).toISOString() : null);
+const iso = (hasta) => { const d = aFecha(hasta); return d ? d.toISOString() : null; };
 function diasRestantes(hasta, ahora = Date.now()) {
   const d = aFecha(hasta);
   return d && d.getTime() > ahora ? Math.ceil((d.getTime() - ahora) / 86400000) : 0;
 }
 
 async function estado(usuarioId, t) {
-  const u = await one('SELECT premium_hasta FROM usuarios WHERE id=:id', { id: usuarioId }, t);
-  const hasta = u ? u.premium_hasta : null;
+  const u = await one("SELECT DATE_FORMAT(premium_hasta, '%Y-%m-%dT%H:%i:%sZ') AS hasta FROM usuarios WHERE id=:id", { id: usuarioId }, t);
+  const hasta = u ? u.hasta : null;
   return { premium: activo(hasta), premium_hasta: activo(hasta) ? iso(hasta) : null, dias_restantes: diasRestantes(hasta) };
 }
 const esPremium = async (usuarioId, t) => (await estado(usuarioId, t)).premium;
@@ -38,10 +45,11 @@ async function extender(usuarioId, dias, motivo, { pagoId = null, adminId = null
   await run(
     `UPDATE usuarios SET premium_hasta = DATE_ADD(GREATEST(COALESCE(premium_hasta, UTC_TIMESTAMP()), UTC_TIMESTAMP()), INTERVAL :d DAY)
      WHERE id=:u`, { d: dias, u: usuarioId }, t);
-  const u = await one('SELECT premium_hasta FROM usuarios WHERE id=:u', { u: usuarioId }, t);
+  // la fecha se formatea en SQL: asi no depende de como el driver entregue los DATETIME
+  const u = await one("SELECT premium_hasta, DATE_FORMAT(premium_hasta, '%Y-%m-%dT%H:%i:%sZ') AS hasta_iso FROM usuarios WHERE id=:u", { u: usuarioId }, t);
   await insert('INSERT INTO premium_movimientos (usuario_id,motivo,dias,hasta,pago_id,admin_id,nota) VALUES (:u,:m,:d,:h,:p,:a,:n)',
     { u: usuarioId, m: motivo, d: dias, h: u.premium_hasta, p: pagoId, a: adminId, n: nota }, t);
-  return iso(u.premium_hasta);
+  return u.hasta_iso;
 }
 
 async function revocar(usuarioId, adminId, nota, t) {
