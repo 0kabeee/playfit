@@ -3,6 +3,7 @@ const { http, push } = require('@playfit/shared');
 const { E } = require('@playfit/shared');
 const soc = require('./index');
 const internal = require('./internal');
+const pagos = require('./pagos');
 const { asyncHandler: ah, authenticate, intParam, optInt, createServiceApp } = http;
 
 function createApp() {
@@ -39,6 +40,14 @@ function createApp() {
     r.get('/admin/support/:id', ah(async (req, res) => res.json(await soc.verConversacionAdmin(req.actor, intParam(req.params.id), { ip: req.ip }))));
     r.post('/admin/support/:id/messages', ah(async (req, res) => res.status(201).json(await soc.responderAdmin(req.actor, intParam(req.params.id), body(req).mensaje, { ip: req.ip }))));
     r.post('/admin/support/:id/close', ah(async (req, res) => { await soc.cerrarAdmin(req.actor, intParam(req.params.id), { ip: req.ip }); res.status(204).end(); }));
+    // Fase 14: el admin envia el enlace de pago de Wompi desde la conversacion de Soporte
+    r.post('/admin/support/:id/payment-link', ah(async (req, res) => res.status(201).json(await pagos.enviarEnlacePago(req.actor, intParam(req.params.id), { ip: req.ip }))));
+
+    // PlayFit Premium (Fase 14)
+    r.get('/premium', ah(async (req, res) => res.json(await pagos.miPremium(req.actor))));
+    r.get('/admin/payments', ah(async (req, res) => res.json(await pagos.listarPagosAdmin(req.actor))));
+    r.post('/admin/users/:id/premium', ah(async (req, res) => res.status(201).json(await pagos.darCortesia(req.actor, intParam(req.params.id), body(req), { ip: req.ip }))));
+    r.delete('/admin/users/:id/premium', ah(async (req, res) => { await pagos.revocarPremium(req.actor, intParam(req.params.id), body(req), { ip: req.ip }); res.status(204).end(); }));
 
     // administracion de retos oficiales (solo admin: el servicio lo valida por permiso)
     r.get('/admin/challenges', ah(async (req, res) => res.json(await soc.listarRetosAdmin(req.actor))));
@@ -70,6 +79,16 @@ function createApp() {
     // rankings
     r.get('/rankings/xp', ah(async (req, res) => res.json(await soc.rankingXp(req.actor, { limite: req.query.limit, squadId: optInt(req.query.squad, 'squad') }))));
     r.get('/rankings/exercises/:id', ah(async (req, res) => res.json(await soc.rankingEjercicio(req.actor, intParam(req.params.id), { limite: req.query.limit }))));
+
+    // Wompi (SIN token de PlayFit): el webhook se valida con la FIRMA del evento y el retorno consulta a Wompi.
+    // Van antes del router autenticado.
+    const pub = express.Router();
+    pub.post('/events', ah(async (req, res) => { const r2 = await pagos.recibirEvento(req.body); res.status(r2.status).json(r2.body); }));
+    pub.get('/return', ah(async (req, res) => {
+      const r2 = await pagos.retornoCheckout(typeof req.query.id === 'string' ? req.query.id : '');
+      res.status(200).type('html').send(pagos.paginaRetorno(r2.resultado));
+    }));
+    app.use('/api/social/payments/wompi', pub);
 
     app.use('/api/social', r);
     // API interna para n8n (no la expone el gateway; ver internal.js)

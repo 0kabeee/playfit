@@ -2,7 +2,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { one, select, insert, run, tx, E, rbac, audit } = require('@playfit/shared');
+const { one, select, insert, run, tx, E, rbac, audit, premium: PREM } = require('@playfit/shared');
 const textos = require('./consentTexts');
 
 const ACCESS_TTL = '15m';
@@ -34,7 +34,9 @@ function validarNombre(v, campo) {
 
 const publico = (u) => ({
   id: u.id, rol: u.rol, nombre: u.nombre, apellido: u.apellido, email: u.email,
-  codigo_estudiantil: u.codigo_estudiantil, avatar_color: u.avatar_color, dos_factores: !!u.totp_activo
+  codigo_estudiantil: u.codigo_estudiantil, avatar_color: u.avatar_color, dos_factores: !!u.totp_activo,
+  // Fase 14: PlayFit Premium (personalizacion del asistente)
+  premium: PREM.activo(u.premium_hasta), premium_hasta: PREM.activo(u.premium_hasta) ? PREM.iso(u.premium_hasta) : null
 });
 
 // ---------- tokens ----------
@@ -263,7 +265,7 @@ async function cambiarEstadoUsuario(actor, usuarioId, activo) {
 }
 async function listarUsuarios(actor) {
   rbac.requirePermiso(actor, 'usuario:gestionar');
-  return select('SELECT u.id, r.nombre AS rol, u.nombre, u.apellido, u.email, u.activo, u.totp_activo AS dos_factores, u.ultimo_login, u.created_at FROM usuarios u JOIN roles r ON r.id=u.rol_id ORDER BY u.id');
+  return select('SELECT u.id, r.nombre AS rol, u.nombre, u.apellido, u.email, u.activo, u.totp_activo AS dos_factores, u.premium_hasta, (u.premium_hasta IS NOT NULL AND u.premium_hasta > UTC_TIMESTAMP()) AS premium, u.ultimo_login, u.created_at FROM usuarios u JOIN roles r ON r.id=u.rol_id ORDER BY u.id');
 }
 
 module.exports = {

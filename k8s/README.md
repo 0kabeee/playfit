@@ -278,6 +278,47 @@ El `db-init` debe aplicar `06_fase13.sql`. En el log de `social` debe salir `[pu
 ### 5.4 Activar los flujos de n8n
 Sigue `k8s/n8n/README.md` (abrir el editor con `port-forward`, importar los 3 flujos y activarlos). Sin n8n la app funciona igual: lo único que se pierde son los avisos automáticos (racha y resumen semanal); el aviso a los admins por Soporte tiene respaldo.
 
+## 5b. Fase 14: PlayFit Premium y pagos con Wompi (sandbox)
+
+En **sandbox** no se cobra plata real: Wompi simula los pagos con datos de prueba.
+
+### 5b.1 Cuenta de Wompi y llaves (gratis, una vez)
+1. Regístrate en https://comercios.wompi.co. Las llaves de **sandbox** están disponibles desde el principio, no hace falta verificar la empresa.
+2. En el panel, entra a *Desarrolladores* y copia:
+   - la **llave pública** `pub_test_...` (no es secreta);
+   - la **llave privada** `prv_test_...` (secreta: crea los enlaces de pago);
+   - el **secreto de eventos** `test_events_...` (secreto: con él se verifica la firma de los avisos de Wompi).
+3. En la misma sección, en **URL de eventos** del ambiente de pruebas (sandbox), pon:
+   `https://playfit-usb.chilecentral.cloudapp.azure.com/api/social/payments/wompi/events`
+
+### 5b.2 Configurar
+```
+node k8s\generar-secretos.js azure
+```
+Agrega `WOMPI_PRIVATE_KEY=` y `WOMPI_EVENTS_SECRET=` al final de `k8s\overlays\azure\secrets.env` (sin tocar lo demás): pega ahí tus dos llaves secretas. La llave pública va en `k8s\overlays\azure\kustomization.yaml`, en la línea marcada `WOMPI_PUBLIC_KEY` (`<-- CAMBIA`). Ninguna llave se pega en el chat ni se sube a Git.
+
+### 5b.3 Desplegar la versión 1.4.0
+```
+docker build -t ghcr.io/0kabeee/playfit-backend:1.4.0 playfit-backend
+docker push ghcr.io/0kabeee/playfit-backend:1.4.0
+```
+Cambia `newTag: "1.4.0"` y aplica (`kubectl apply -k k8s\overlays\azure` y `kubectl rollout status deployment -n playfit`). La migración `07_fase14.sql` la aplica sola el auth-service al arrancar.
+
+### 5b.4 Probar el pago
+1. Con una cuenta de usuario: *Perfil › PlayFit Premium › Quiero el Premium*. La conversación pasa a Soporte.
+2. Con el admin: pestaña *Soporte* › abre la conversación › **Enviar enlace de pago Premium**.
+3. Con el usuario: en *Ayuda y soporte* aparece la tarjeta **Pagar con Wompi** → se abre el checkout.
+4. Datos de prueba de Wompi sandbox:
+   - Tarjeta **aprobada**: `4242 4242 4242 4242` (cualquier fecha futura y cualquier CVC de 3 dígitos). **Rechazada**: `4111 1111 1111 1111`.
+   - Nequi **aprobado**: `3991111111`. **Rechazado**: `3992222222`.
+   - PSE: elige *Banco que aprueba* o *Banco que rechaza*.
+5. Wompi avisa al backend (webhook firmado) y el Premium queda activo 30 días: llega una notificación, el chat dice *Pago aprobado* y en *Perfil* aparece **Eres Premium**. Si el webhook no llega, al volver del checkout la página `/api/social/payments/wompi/return` consulta la transacción a Wompi y la aplica igual.
+6. Si n8n está activo, importa también `k8s\n8n\flujos\pago-aprobado.json` (aviso a los admins). Sin n8n el backend avisa por su cuenta.
+
+**Premium de cortesía:** en el panel admin › *Usuarios* › toca a la persona › *Dar Premium de cortesía* (7, 30 o 90 días). Sirve para los participantes del piloto.
+
+**Riesgo documentado:** si la app se publica en Google Play, sus políticas exigen Google Play Billing para suscripciones digitales; el Premium con Wompi sirve para la demo con el APK instalado directamente.
+
 ## 6. Problemas comunes
 
 | Síntoma | Qué revisar |

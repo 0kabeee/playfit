@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import '../common.dart';
+import 'premium.dart';
 
 /// Burbuja de chat de soporte. `mia`: la escribio quien mira la pantalla.
 class SoporteBubble extends StatelessWidget {
   final Map<String, dynamic> m;
   final bool mia;
-  const SoporteBubble(this.m, {super.key, required this.mia});
+  final bool vistaAdmin;
+  const SoporteBubble(this.m, {super.key, required this.mia, this.vistaAdmin = false});
 
   static String quien(String autor) {
     switch (autor) {
@@ -21,6 +23,26 @@ class SoporteBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final burbuja = _burbuja();
+    final pago = m['pago'];
+    if (pago is! Map) return burbuja;
+    // mensaje con enlace de pago (Fase 14): debajo va la tarjeta con el boton "Pagar con Wompi"
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: mia ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          burbuja,
+          Padding(
+            padding: EdgeInsets.only(left: mia ? 48 : 0, right: mia ? 0 : 40),
+            child: PagoCard(asMap(pago), admin: vistaAdmin),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _burbuja() {
     final autor = asStr(m['autor']);
     final hora = Fmt.relative(asStr(m['created_at']));
     if (mia) {
@@ -128,7 +150,9 @@ class SoporteInput extends StatelessWidget {
 /// Chat de ayuda. Responde un asistente automatico; si hablas de pagos o Premium (o pides una persona),
 /// la conversacion pasa a un humano del equipo de PlayFit.
 class SoporteScreen extends StatefulWidget {
-  const SoporteScreen({super.key});
+  /// Si viene, se envia apenas abre la pantalla (p. ej. "Quiero el Premium" desde la pantalla Premium).
+  final String? mensajeInicial;
+  const SoporteScreen({super.key, this.mensajeInicial});
 
   @override
   State<SoporteScreen> createState() => _SoporteScreenState();
@@ -146,7 +170,10 @@ class _SoporteScreenState extends State<SoporteScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    _load().then((_) {
+      final inicial = widget.mensajeInicial;
+      if (inicial != null && inicial.trim().isNotEmpty && mounted) _send(inicial);
+    });
     // mientras un humano atiende, se revisa cada 8 s si llegaron respuestas
     _poll = Timer.periodic(const Duration(seconds: 8), (_) {
       if (_conHumano) _load(silent: true);

@@ -42,7 +42,11 @@ async function metricas(actor) {
     retos_de_squad_activos: await n('SELECT COUNT(*) AS n FROM retos WHERE activo=1 AND squad_id IS NOT NULL AND fecha_fin >= CURDATE()'),
     duelos_activos: await n("SELECT COUNT(*) AS n FROM duelos WHERE estado='activo'"),
     soporte_pendientes: await n("SELECT COUNT(*) AS n FROM soporte_conversaciones WHERE estado='pendiente'"),
-    usuarios_con_2fa: await n('SELECT COUNT(*) AS n FROM usuarios WHERE totp_activo=1')
+    usuarios_con_2fa: await n('SELECT COUNT(*) AS n FROM usuarios WHERE totp_activo=1'),
+    // Fase 14: Premium y pagos (sandbox)
+    premium_activos: await n('SELECT COUNT(*) AS n FROM usuarios WHERE premium_hasta > UTC_TIMESTAMP()'),
+    pagos_aprobados_30d: await n("SELECT COUNT(*) AS n FROM pagos WHERE estado='aprobado' AND pagado_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY)"),
+    pagos_pendientes: await n("SELECT COUNT(*) AS n FROM pagos WHERE estado='pendiente' AND expira_at > UTC_TIMESTAMP()")
   };
 }
 module.exports = { auditoria, metricas };

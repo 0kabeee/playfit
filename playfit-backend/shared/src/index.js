@@ -8,6 +8,8 @@ module.exports = {
   soporte: require('./soporte'),
   push: require('./push'),
   eventos: require('./eventos'),
+  premium: require('./premium'),
+  wompi: require('./wompi'),
   dbReset: require('./dbReset'),
   env: require('./env'),
   http: require('./http')

@@ -1,0 +1,157 @@
+{
+  "name": "PlayFit - Aviso a los admins por pago aprobado (Wompi)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pago-aprobado",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "15ca27f8-1488-4ed9-9005-8906a8715d71",
+      "name": "Evento del backend",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "c91c3165-43d4-47dd-a923-a09bc71d38a2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "95f8f44c-27cb-4f26-93e4-727547b1d3f8",
+              "leftValue": "={{ $json.headers['x-playfit-token'] }}",
+              "rightValue": "={{ $env.PLAYFIT_N8N_TOKEN }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9f8413ab-1d2f-4a1f-90da-a95a3bfa5a82",
+      "name": "Token valido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Solo llegan ids (nunca datos de tarjeta, nombres ni correos).\nconst { pago_id } = $input.first().json.body;\nreturn [{ json: {\n  destino: 'admins',\n  tipo: 'pago',\n  titulo: 'Pago aprobado',\n  cuerpo: `Wompi confirmo el pago #${pago_id}: el Premium quedo activo.`\n}, pairedItem: 0 }];"
+      },
+      "id": "2b638500-67c7-4449-9fdc-772221b76eea",
+      "name": "Armar aviso",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PLAYFIT_API_URL }}/notificaciones",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-playfit-token",
+              "value": "={{ $env.PLAYFIT_N8N_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "26c8897a-210d-4bd1-815b-1b97b29c5259",
+      "name": "Crear notificaciones",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "errorMessage": "Token invalido: el evento no viene del backend de PlayFit"
+      },
+      "id": "3377da04-f1c7-42de-bf0f-52b82bad1ff0",
+      "name": "Rechazar",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        440,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "Evento del backend": {
+      "main": [
+        [
+          {
+            "node": "Token valido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Token valido?": {
+      "main": [
+        [
+          {
+            "node": "Armar aviso",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rechazar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar aviso": {
+      "main": [
+        [
+          {
+            "node": "Crear notificaciones",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Bogota"
+  },
+  "active": false,
+  "versionId": "32145074-1f9f-4fcd-bc12-5abb98a862ec"
+}

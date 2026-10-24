@@ -3,7 +3,7 @@
 //  - Si la base esta vacia: crea el esquema y carga el catalogo + datos de ejemplo (02_seed.sql).
 //    Si DEMO_PASSWORD esta definido, TODAS las cuentas del seed quedan con esa contrasena (en la nube nunca se
 //    deja la contrasena publica del README).
-//  - Siempre aplica las migraciones idempotentes (03_fase7.sql, 04_fase11.sql, 05_fase12.sql y 06_fase13.sql).
+//  - Siempre aplica las migraciones idempotentes (03_fase7.sql, 04_fase11.sql, 05_fase12.sql, 06_fase13.sql y 07_fase14.sql).
 // Usa un candado de MariaDB (GET_LOCK) para que dos copias corriendo a la vez no se pisen.
 // Uso:  node scripts/db-init.js        (lee la configuracion del entorno o del .env)
 const fs = require('fs');

@@ -5,7 +5,7 @@ const PERMISOS = {
     'clinico:leer_propio', 'clinico:escribir_propio', 'ia:usar', 'contenido:ver', 'soporte:usar'
   ],
   admin: [
-    'usuario:gestionar', 'reto:crear', 'contenido:gestionar', 'ranking:ver', 'auditoria:ver', 'metricas:ver', 'soporte:atender'
+    'usuario:gestionar', 'reto:crear', 'contenido:gestionar', 'ranking:ver', 'auditoria:ver', 'metricas:ver', 'soporte:atender', 'pagos:gestionar'
   ]
 };
 const { E } = require('./errors');

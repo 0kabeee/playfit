@@ -23,6 +23,7 @@ n8n es la herramienta de automatizaciones (gratis y *self-hosted*) que pidió el
 | `racha-en-riesgo.json` | Todos los días 7 p. m. (Bogotá) | Busca a quien tiene racha ≥ 2 y entrenó por última vez ayer, y le avisa «Tu racha está en riesgo». No repite el aviso el mismo día. |
 | `resumen-semanal.json` | Domingos 6 p. m. | A cada squad: cuántos entrenaron, sesiones, repeticiones y retos en curso. |
 | `soporte-transferida.json` | Cuando el backend lo avisa | Un usuario pasó a Soporte con un humano (pagos o pidió una persona) → notificación a todos los admins. Si el token no coincide, rechaza el evento y el backend usa su respaldo. |
+| `pago-aprobado.json` | Cuando el backend lo avisa (Fase 14) | Wompi confirmó un pago y el Premium quedó activo → notificación a todos los admins. Solo viaja el número del pago. Sin n8n, el backend usa su respaldo. |
 
 Los dos primeros tienen además un botón **«Ejecutar ahora»** (disparo manual) para mostrarlos en la demo sin esperar al horario.
 
@@ -72,4 +73,4 @@ curl -H "x-playfit-token: TU_N8N_TOKEN" http://localhost:3003/internal/rachas-en
 
 ## Verificado
 
-Los 3 flujos se importaron en n8n 1.123.5 y se ejecutaron contra el social-service real (base `playfit_test`): «racha en riesgo» creó el aviso para el usuario en riesgo, el resumen semanal creó una notificación por miembro de cada squad, y el webhook de Soporte notificó al admin (con un token equivocado n8n rechazó el evento y el backend usó el respaldo).
+Los 3 flujos de la Fase 13 se importaron en n8n 1.123.5 y se ejecutaron contra el social-service real (base `playfit_test`): «racha en riesgo» creó el aviso para el usuario en riesgo, el resumen semanal creó una notificación por miembro de cada squad, y el webhook de Soporte notificó al admin (con un token equivocado n8n rechazó el evento y el backend usó el respaldo).

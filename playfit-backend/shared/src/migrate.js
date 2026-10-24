@@ -1,8 +1,8 @@
-// Aplica las migraciones idempotentes (03_fase7, 04_fase11, 05_fase12 y 06_fase13) sobre una base ya existente.
+// Aplica las migraciones idempotentes (03_fase7, 04_fase11, 05_fase12, 06_fase13 y 07_fase14) sobre una base ya existente.
 const fs = require('fs');
 const path = require('path');
 
-const ARCHIVOS = ['03_fase7.sql', '04_fase11.sql', '05_fase12.sql', '06_fase13.sql'];
+const ARCHIVOS = ['03_fase7.sql', '04_fase11.sql', '05_fase12.sql', '06_fase13.sql', '07_fase14.sql'];
 
 // Parte un archivo .sql en sentencias (los archivos de migracion no tienen ';' dentro de textos).
 function sentencias(texto) {

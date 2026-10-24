@@ -29,6 +29,14 @@ patches:
       - op: replace
         path: /data/GATEWAY_TRUST_PROXY
         value: "1"
+      # Fase 14: a donde vuelve el usuario despues de pagar en Wompi
+      - op: replace
+        path: /data/WOMPI_REDIRECT_URL
+        value: https://playfit-usb.chilecentral.cloudapp.azure.com/api/social/payments/wompi/return   # <-- CAMBIA si cambia el dominio
+      # Fase 14: llave PUBLICA de Wompi sandbox (pub_test_..., no es secreta)
+      - op: replace
+        path: /data/WOMPI_PUBLIC_KEY
+        value: ""   # <-- CAMBIA: pega tu pub_test_...
   # Solo Caddy (HTTPS) puede hablar con el gateway
   - target: { kind: NetworkPolicy, name: gateway-entrada }
     patch: |-

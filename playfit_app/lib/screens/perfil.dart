@@ -1,4 +1,5 @@
 import '../common.dart';
+import 'premium.dart';
 import 'ranking.dart';
 import 'security_screens.dart';
 import 'sesiones.dart';
@@ -104,6 +105,22 @@ class PerfilTab extends StatelessWidget {
                 onTap: () => _push(context, const RankingScreen()),
               ),
             ]),
+            const SectionLabel('PlayFit Premium'),
+            ListenableBuilder(
+              listenable: app,
+              builder: (context, _) => RowCard([
+                RowTile(
+                  title: app.isPremium ? 'Eres Premium' : 'Hazte Premium',
+                  sub: app.isPremium
+                      ? 'Activo hasta el ${fechaPremium(asStr(app.user['premium_hasta']))}'
+                      : 'Asistente con memoria, voz y más mensajes',
+                  left: const IconDisc('sparkles', tone: 'purple'),
+                  right: app.isPremium ? const PfBadge('Premium', tone: 'purple') : null,
+                  chevron: true,
+                  onTap: () => _push(context, const PremiumScreen()),
+                ),
+              ]),
+            ),
             const SectionLabel('Ayuda'),
             RowCard([
               RowTile(

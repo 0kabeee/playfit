@@ -13,8 +13,20 @@ function validarTexto(m) {
   return m.trim();
 }
 
-const mensajesDe = (convId) =>
-  select('SELECT id, autor, contenido, created_at FROM soporte_mensajes WHERE conversacion_id=:c ORDER BY id', { c: convId });
+// Los mensajes con enlace de pago (Fase 14) traen el pago para que la app muestre la tarjeta con el boton "Pagar".
+async function mensajesDe(convId) {
+  const filas = await select(
+    `SELECT m.id, m.autor, m.contenido, m.created_at, m.pago_id,
+            p.estado AS pago_estado, p.monto_centavos AS pago_monto, p.dias AS pago_dias, p.checkout_url AS pago_url, p.ambiente AS pago_ambiente
+     FROM soporte_mensajes m LEFT JOIN pagos p ON p.id=m.pago_id WHERE m.conversacion_id=:c ORDER BY m.id`, { c: convId });
+  return filas.map(({ pago_id: pagoId, pago_estado: est, pago_monto: monto, pago_dias: dias, pago_url: url, pago_ambiente: amb, ...m }) => ({
+    ...m,
+    pago: pagoId ? {
+      id: pagoId, estado: est, monto_cop: Math.round(Number(monto) / 100), dias: Number(dias), ambiente: amb,
+      checkout_url: est === 'pendiente' ? url : null
+    } : null
+  }));
+}
 
 const vistaUsuario = async (c) => (c ? {
   id: c.id, estado: c.estado, motivo: c.motivo, con_humano: ['pendiente', 'atendiendo'].includes(c.estado),

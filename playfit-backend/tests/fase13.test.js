@@ -137,6 +137,8 @@ test('agente: crear_reto_squad propone un reto valido para el endpoint del squad
 // ---------------------------------------------------------------- memoria
 test('memoria: guarda solo preferencias estructuradas, entra al prompt, el usuario la ve y la borra', async () => {
   await darConsentimientoIA(7);
+  // desde la Fase 14 la memoria del agente es Premium
+  await sequelize.query('UPDATE usuarios SET premium_hasta = UTC_TIMESTAMP() + INTERVAL 10 DAY WHERE id=7');
   const llm = llmQueLlama(
     ['guardar_preferencia', { clave: 'objetivo', valor: 'Fuerza' }],
     ['guardar_preferencia', { clave: 'dias_semana', valor: '4' }],

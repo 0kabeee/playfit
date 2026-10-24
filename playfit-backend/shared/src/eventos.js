@@ -45,4 +45,11 @@ const soporteTransferida = (conversacionId, motivo, opciones = {}) =>
     respaldo: () => notificarAdmins('Nueva conversacion en Soporte', `Un usuario fue transferido a un humano (${MOTIVOS[motivo] || motivo}).`)
   });
 
-module.exports = { emitir, notificarAdmins, soporteTransferida, EVENTOS };
+// Se llama cuando Wompi confirma un pago (el flujo de n8n avisa a los admins; sin n8n, el respaldo hace lo mismo).
+const pagoAprobado = (pagoId, usuarioId, opciones = {}) =>
+  emitir('pago-aprobado', { pago_id: pagoId, usuario_id: usuarioId }, {
+    ...opciones,
+    respaldo: () => notificarAdmins('Pago aprobado', `Wompi confirmo el pago #${pagoId}: el Premium quedo activo.`, 'pago')
+  });
+
+module.exports = { emitir, notificarAdmins, soporteTransferida, pagoAprobado, EVENTOS };

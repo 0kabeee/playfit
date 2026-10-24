@@ -42,6 +42,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       app.syncPending();
       app.refreshUnread();
+      app.refreshMe(); // p. ej. el Premium recien pagado en Wompi
       app.bump(); // al volver a la app se refrescan los datos
     }
   }

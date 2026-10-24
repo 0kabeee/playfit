@@ -99,6 +99,8 @@ class AdminResumenTab extends StatelessWidget {
             MetricTile('Duelos en curso', '${asInt(m['duelos_activos'])}'),
             MetricTile('Soporte pendiente', '${asInt(m['soporte_pendientes'])}'),
             MetricTile('Con 2FA', '${asInt(m['usuarios_con_2fa'])}'),
+            MetricTile('Premium activos', '${asInt(m['premium_activos'])}'),
+            MetricTile('Pagos (30 días)', '${asInt(m['pagos_aprobados_30d'])}'),
           ]),
           const SectionLabel('Sesiones por semana'),
           if (semanas.isEmpty)
@@ -193,11 +195,41 @@ class _AdminUsuariosTabState extends State<AdminUsuariosTab> {
     // (los controladores no se liberan aqui: la hoja sigue animando su cierre y aun los usa)
   }
 
+  Future<void> _cortesia(Map<String, dynamic> u) async {
+    final id = asInt(u['id']);
+    final dias = await showPfSheet<int>(
+      context,
+      (ctx) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Premium de cortesía', style: Tx.display(size: 19)),
+          const SizedBox(height: 6),
+          Text('Para ${asStr(u['nombre'])} (p. ej. participantes del piloto). Se suma a lo que ya tenga.', style: Tx.body(size: 12.5, color: C.inkSoft)),
+          const SizedBox(height: 14),
+          for (final d in const [7, 30, 90]) ...[
+            PfButton('$d días', kind: BtnKind.secondary, onPressed: () => Navigator.pop(ctx, d)),
+            const SizedBox(height: 8),
+          ],
+        ],
+      ),
+    );
+    if (dias == null) return;
+    try {
+      await app.api.post('/api/social/admin/users/$id/premium', body: {'dias': dias, 'nota': 'Cortesia desde el panel'});
+      toast('Premium de cortesía: $dias días', type: ToastType.success);
+      app.bump();
+    } on ApiException catch (e) {
+      toast(e.message, type: ToastType.error);
+    }
+  }
+
   Future<void> _actions(Map<String, dynamic> u) async {
     final id = asInt(u['id']);
     final activo = asBool(u['activo']);
     final es2fa = asBool(u['dos_factores']);
     final soyYo = id == app.userId;
+    final esUsuario = asStr(u['rol']) != 'admin';
+    final premium = asBool(u['premium']);
     await showPfSheet<void>(
       context,
       (ctx) => Column(
@@ -228,6 +260,28 @@ class _AdminUsuariosTabState extends State<AdminUsuariosTab> {
                 toast(e.message, type: ToastType.error);
               }
             }),
+            if (esUsuario) ...[
+              const SizedBox(height: 10),
+              PfButton(premium ? 'Dar más días de Premium' : 'Dar Premium de cortesía', kind: BtnKind.secondary, icon: 'sparkles', onPressed: () async {
+                Navigator.pop(ctx);
+                await _cortesia(u);
+              }),
+              if (premium) ...[
+                const SizedBox(height: 10),
+                PfButton('Quitar Premium', kind: BtnKind.secondary, onPressed: () async {
+                  Navigator.pop(ctx);
+                  final ok = await confirmSheet(context, title: '¿Quitar el Premium?', body: 'La persona vuelve al plan gratis de inmediato. Queda registrado en la auditoría.', action: 'Quitar', danger: true);
+                  if (!ok) return;
+                  try {
+                    await app.api.delete('/api/social/admin/users/$id/premium');
+                    toast('Premium retirado', type: ToastType.success);
+                    app.bump();
+                  } on ApiException catch (e) {
+                    toast(e.message, type: ToastType.error);
+                  }
+                }),
+              ],
+            ],
             if (es2fa) ...[
               const SizedBox(height: 10),
               PfButton('Restablecer su 2FA', kind: BtnKind.secondary, onPressed: () async {
@@ -286,6 +340,7 @@ class _AdminUsuariosTabState extends State<AdminUsuariosTab> {
                       sub: '${asStr(u['email'])} · ${asStr(u['rol']) == 'admin' ? 'Admin' : 'Usuario'}',
                       left: Avatar(Fmt.initials(asStr(u['nombre']), asStr(u['apellido'])), size: 38),
                       right: Wrap(spacing: 4, children: [
+                        if (asBool(u['premium'])) const PfBadge('Premium', tone: 'purple'),
                         if (asBool(u['dos_factores'])) const PfBadge('2FA', tone: 'green'),
                         if (!asBool(u['activo'])) const PfBadge('Inactiva', tone: 'grey'),
                       ]),
@@ -596,6 +651,28 @@ class _AdminSoporteChatScreenState extends State<AdminSoporteChatScreen> {
     }
   }
 
+  Future<void> _enlacePago() async {
+    final ok = await confirmSheet(
+      context,
+      title: '¿Enviar el enlace de pago?',
+      body: 'Se crea en Wompi un enlace de un solo uso para PlayFit Premium (30 días, precio fijo). El usuario lo verá en este chat. Si ya tiene uno vigente, se reenvía el mismo.',
+      action: 'Enviar enlace',
+      danger: false,
+    );
+    if (!ok) return;
+    setState(() => _sending = true);
+    try {
+      await app.api.post('/api/social/admin/support/${widget.conversacionId}/payment-link');
+      toast('Enlace de pago enviado', type: ToastType.success);
+      await _load(silent: true);
+      _scrollDown();
+    } on ApiException catch (e) {
+      toast(e.message, type: ToastType.error);
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
   Future<void> _cerrar() async {
     final ok = await confirmSheet(context, title: '¿Cerrar la conversación?', body: 'El usuario verá que fue cerrada. Si escribe de nuevo se abre otra.', action: 'Cerrar', danger: false);
     if (!ok) return;
@@ -631,9 +708,14 @@ class _AdminSoporteChatScreenState extends State<AdminSoporteChatScreen> {
             child: ListView(
               controller: _scroll,
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-              children: [for (final m in _mensajes) SoporteBubble(m, mia: asStr(m['autor']) == 'admin')],
+              children: [for (final m in _mensajes) SoporteBubble(m, mia: asStr(m['autor']) == 'admin', vistaAdmin: true)],
             ),
           ),
+          if (!cerrada)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: PfButton('Enviar enlace de pago Premium', kind: BtnKind.gold, small: true, icon: 'sparkles', loading: _sending, onPressed: _enlacePago),
+            ),
           if (cerrada)
             const Padding(padding: EdgeInsets.all(16), child: PanelNote('Esta conversación está cerrada.', icon: 'check-circle'))
           else

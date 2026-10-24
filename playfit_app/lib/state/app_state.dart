@@ -53,6 +53,8 @@ class AppState extends ChangeNotifier {
   bool _syncing = false;
 
   bool get isAdmin => asStr(user['rol']) == 'admin';
+  /// PlayFit Premium (Fase 14): memoria y voz del asistente, mas mensajes al dia.
+  bool get isPremium => asBool(user['premium']);
   int get userId => asInt(user['id']);
   String get firstName => asStr(user['nombre']);
   String get fullName => '${asStr(user['nombre'])} ${asStr(user['apellido'])}'.trim();
@@ -115,6 +117,26 @@ class AppState extends ChangeNotifier {
       syncPending();
       push.registrar();
     }
+  }
+
+  /// Actualiza el estado Premium que llega del servidor (p. ej. al volver del pago).
+  void setPremium(bool premium, String hasta) {
+    if (isPremium == premium && asStr(user['premium_hasta']) == hasta) return;
+    user = {...user, 'premium': premium, 'premium_hasta': hasta.isEmpty ? null : hasta};
+    _cacheUser();
+    notifyListeners();
+  }
+
+  /// Vuelve a pedir el perfil (Premium, 2FA...) sin cerrar la sesion. Si falla, se queda con lo que tenia.
+  Future<void> refreshMe() async {
+    if (status != AuthStatus.loggedIn) return;
+    try {
+      final me = asMap(await api.get('/api/auth/me'));
+      if (asInt(me['id']) != userId) return;
+      user = me;
+      await _cacheUser();
+      notifyListeners();
+    } catch (_) {}
   }
 
   void _loadLocalForUser() {

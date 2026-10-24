@@ -6,11 +6,15 @@
 //  5) Mensajes sobre PAGOS / Premium tampoco van al modelo: se transfieren a un humano (chat de Soporte, Fase 12).
 //  6) (Fase 13) El modelo es un AGENTE: puede llamar funciones (ver agente.js). Las que cambian datos solo quedan
 //     como PROPUESTA hasta que el usuario toca Confirmar en la app.
-const { one, select, insert, run, tx, E, AppError, rbac, soporte, eventos, clock } = require('@playfit/shared');
+//  7) (Fase 14) PlayFit Premium: la MEMORIA del agente y un cupo diario mayor son Premium. Sin Premium el modelo no
+//     recibe la funcion guardar_preferencia ni lo guardado (lo guardado no se borra: vuelve si renueva).
+const { one, select, insert, run, tx, E, AppError, rbac, soporte, eventos, clock, premium: PREM } = require('@playfit/shared');
 const agente = require('./agente');
 
 const MAX_MENSAJE = 1000;
-const limiteDiario = () => Number(process.env.IA_LIMITE_DIARIO || 20);
+const limiteDiario = (esPremium = false) => (esPremium
+  ? Number(process.env.IA_LIMITE_PREMIUM || 60)
+  : Number(process.env.IA_LIMITE_DIARIO || 20));
 
 const SENALES_ALARMA = /dolor (fuerte )?(en el )?pecho|dolor de pecho|desmay|mareo (fuerte|intenso)|falta de aire|no puedo respirar|palpitaciones|vision borrosa|me duele (mucho|demasiado)|lesion grave/;
 const normalizar = (s) => String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -31,12 +35,12 @@ const MENSAJE_ALARMA = 'Lo que describes puede ser una senal de alerta. Deten el
 
 const VALOR_LEGIBLE = (v) => String(v).replace(/_/g, ' ');
 
-async function construirSystemPrompt(estudianteId, { hoy = clock.hoy(), catalogo = null, memoria = null, acciones = [] } = {}) {
+async function construirSystemPrompt(estudianteId, { hoy = clock.hoy(), catalogo = null, memoria = null, acciones = [], premium = true } = {}) {
   const flags = await select(
     `SELECT f.codigo, f.descripcion FROM estudiante_flags ef JOIN flags_clinicos f ON f.codigo=ef.flag_codigo
      WHERE ef.estudiante_id=:e AND f.codigo<>'SIN_RESTRICCIONES' ORDER BY f.codigo`, { e: estudianteId });
   const cat = catalogo || await agente.catalogoPara(estudianteId);
-  const mem = memoria || await agente.leerMemoria(estudianteId);
+  const mem = premium ? (memoria || await agente.leerMemoria(estudianteId)) : [];
   const lineas = [
     'Eres el asistente de PlayFit, una app de entrenamiento para estudiantes universitarios.',
     'Das consejos generales de tecnica, rutinas basicas y habitos saludables, en espanol, en tono cercano y breve (maximo 120 palabras).',
@@ -48,7 +52,9 @@ async function construirSystemPrompt(estudianteId, { hoy = clock.hoy(), catalogo
     '- registrar_sesion y crear_reto_squad solo PROPONEN: la app muestra una tarjeta y el usuario decide. Nunca digas que algo ya quedo registrado o creado.',
     '- Si te falta un dato (series, repeticiones, meta, dias), pregunta antes de proponer.',
     '- consultar_progreso para hablar de su racha, XP, sesiones o retos con datos reales.',
-    '- guardar_preferencia cuando el usuario te diga su objetivo, experiencia, dias, horario, minutos por sesion o equipo.',
+    premium
+      ? '- guardar_preferencia cuando el usuario te diga su objetivo, experiencia, dias, horario, minutos por sesion o equipo.'
+      : '- El usuario NO es Premium: no puedes recordar sus preferencias entre conversaciones. Si te pide que recuerdes algo, dile que la memoria del asistente es parte de PlayFit Premium (se pide en Perfil > PlayFit Premium) y responde con lo que te diga en este chat.',
     '- Para rutinas usa SOLO ejercicios del catalogo y nunca los marcados EVITAR. Adapta la rutina a lo que recuerdas del usuario.',
     '- transferir_a_humano si pide una persona o tiene un problema de cuenta que no puedes resolver.',
     '',
@@ -68,7 +74,9 @@ async function construirSystemPrompt(estudianteId, { hoy = clock.hoy(), catalogo
     lineas.push('Restricciones de seguridad del estudiante (respetalas SIEMPRE al recomendar ejercicios):');
     for (const f of flags) lineas.push(`- ${f.codigo}: ${f.descripcion}`);
   } else lineas.push('El estudiante no tiene restricciones registradas.');
-  if (mem.length) {
+  if (!premium) {
+    // sin memoria: no se le pide al modelo que pregunte para guardar
+  } else if (mem.length) {
     lineas.push('Lo que el usuario te conto de si mismo (preferencias guardadas):');
     for (const m of mem) lineas.push(`- ${agente.MEMORIA[m.clave] ? agente.MEMORIA[m.clave].etiqueta : m.clave}: ${VALOR_LEGIBLE(m.valor)}`);
   } else lineas.push('Aun no sabes sus preferencias; si es natural, preguntale su objetivo y con cuantos dias cuenta.');
@@ -92,6 +100,9 @@ async function chat(actor, { conversacionId = null, mensaje } = {}, { llm } = {}
     if (!conv) throw E.notFound('Conversacion no encontrada');
   }
 
+  const esPremium = await PREM.esPremium(actor.id);
+  const limite = limiteDiario(esPremium);
+
   // Pagos: "Un momento, ya te transfiero a un asistente humano" -> la conversacion llega a la bandeja del admin.
   // No gasta cuota ni se envia nada al modelo.
   if (!detectarEmergencia(mensaje) && soporte.detectarPago(mensaje)) {
@@ -104,7 +115,7 @@ async function chat(actor, { conversacionId = null, mensaje } = {}, { llm } = {}
       return {
         conversacion_id: convId, respuesta: soporte.MSG_TRANSFERENCIA, alerta_salud: false,
         transferido_a_soporte: true, soporte_conversacion_id: sop.id, accion: null, memoria_actualizada: [],
-        restantes_hoy: Math.max(0, limiteDiario() - Number(uso ? uso.solicitudes : 0)),
+        restantes_hoy: Math.max(0, limite - Number(uso ? uso.solicitudes : 0)), premium: esPremium,
         _aviso: sop.transferida ? sop.id : null
       };
     }).then(avisarTransferencia('pago'));
@@ -112,9 +123,11 @@ async function chat(actor, { conversacionId = null, mensaje } = {}, { llm } = {}
 
   // Cuota atomica: se reserva ANTES de llamar al modelo; si el modelo falla se devuelve.
   await run('INSERT INTO ia_uso_diario (estudiante_id,fecha,solicitudes) VALUES (:e,CURDATE(),0) ON DUPLICATE KEY UPDATE solicitudes=solicitudes', { e: actor.id });
-  const reserva = await run('UPDATE ia_uso_diario SET solicitudes=solicitudes+1 WHERE estudiante_id=:e AND fecha=CURDATE() AND solicitudes < :l', { e: actor.id, l: limiteDiario() });
+  const reserva = await run('UPDATE ia_uso_diario SET solicitudes=solicitudes+1 WHERE estudiante_id=:e AND fecha=CURDATE() AND solicitudes < :l', { e: actor.id, l: limite });
   const afectadas = reserva[0]?.affectedRows ?? reserva[1]?.affectedRows ?? reserva[1];
-  if (!afectadas) throw E.tooMany(`Alcanzaste el limite de ${limiteDiario()} mensajes al asistente por hoy. Vuelve manana.`, 'CUOTA_IA_AGOTADA');
+  if (!afectadas) {
+    throw E.tooMany(`Alcanzaste el limite de ${limite} mensajes al asistente por hoy. Vuelve manana${esPremium ? '' : ' o hazte Premium para tener mas'}.`, 'CUOTA_IA_AGOTADA');
+  }
   const devolverCuota = () => run('UPDATE ia_uso_diario SET solicitudes=GREATEST(solicitudes-1,0) WHERE estudiante_id=:e AND fecha=CURDATE()', { e: actor.id });
 
   let respuesta, flagsAplicados = [], ejecutor = null;
@@ -126,13 +139,13 @@ async function chat(actor, { conversacionId = null, mensaje } = {}, { llm } = {}
       const hoy = clock.hoy();
       const catalogo = await agente.catalogoPara(actor.id);
       const acciones = conv ? await select('SELECT resumen, estado FROM ia_acciones WHERE conversacion_id=:c ORDER BY id DESC LIMIT 3', { c: conv.id }) : [];
-      const system = await construirSystemPrompt(actor.id, { hoy, catalogo, acciones: acciones.reverse() });
+      const system = await construirSystemPrompt(actor.id, { hoy, catalogo, acciones: acciones.reverse(), premium: esPremium });
       flagsAplicados = (await select(`SELECT flag_codigo FROM estudiante_flags WHERE estudiante_id=:e AND flag_codigo<>'SIN_RESTRICCIONES'`, { e: actor.id })).map((f) => f.flag_codigo);
       const historial = conv ? (await select('SELECT rol,contenido FROM mensajes_ia WHERE conversacion_id=:c ORDER BY id DESC LIMIT 10', { c: conv.id })).reverse() : [];
-      ejecutor = agente.crearEjecutor(actor, { catalogo, hoy });
+      ejecutor = agente.crearEjecutor(actor, { catalogo, hoy, premium: esPremium });
       respuesta = await llm.generate({
         system, history: historial.map((h) => ({ role: h.rol, text: h.contenido })), userMessage: mensaje.trim(),
-        tools: agente.FUNCIONES, ejecutarFuncion: ejecutor.ejecutar
+        tools: agente.funcionesPara(esPremium), ejecutarFuncion: ejecutor.ejecutar
       });
       if (typeof respuesta === 'string' && respuesta.trim()) respuesta = corregirPromesas(respuesta, ejecutor.estado);
       if (typeof respuesta !== 'string' || !respuesta.trim()) {
@@ -167,7 +180,7 @@ async function chat(actor, { conversacionId = null, mensaje } = {}, { llm } = {}
       conversacion_id: convId, respuesta, alerta_salud: alarma,
       transferido_a_soporte: !!sop, ...(sop ? { soporte_conversacion_id: sop.id } : {}),
       accion, memoria_actualizada: est.memoria,
-      restantes_hoy: Math.max(0, limiteDiario() - Number(uso.solicitudes)),
+      restantes_hoy: Math.max(0, limite - Number(uso.solicitudes)), premium: esPremium,
       _aviso: sop && sop.transferida ? sop.id : null
     };
   }).then(avisarTransferencia(est.transferir));

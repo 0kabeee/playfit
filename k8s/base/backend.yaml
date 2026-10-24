@@ -278,6 +278,19 @@ spec:
                 secretKeyRef:
                   name: playfit-secrets
                   key: JWT_SECRET
+            # Fase 14: pagos con Wompi (sandbox). Sin estas llaves el resto funciona y el enlace de pago avisa que falta configurarlo.
+            - name: WOMPI_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: playfit-secrets
+                  key: WOMPI_PRIVATE_KEY
+                  optional: true
+            - name: WOMPI_EVENTS_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: playfit-secrets
+                  key: WOMPI_EVENTS_SECRET
+                  optional: true
             # Fase 13: push con Firebase (opcional) y token de la API interna para n8n (opcional)
             - name: FCM_SERVICE_ACCOUNT
               valueFrom:

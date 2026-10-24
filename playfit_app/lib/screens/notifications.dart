@@ -1,5 +1,6 @@
 import '../common.dart';
 import 'duelos.dart';
+import 'premium.dart';
 import 'soporte.dart';
 
 class NotificationsScreen extends StatelessWidget {
@@ -21,6 +22,8 @@ class NotificationsScreen extends StatelessWidget {
         return 'target';
       case 'soporte':
         return 'message-circle';
+      case 'pago':
+        return 'sparkles';
       default:
         return 'bell';
     }
@@ -42,6 +45,8 @@ class NotificationsScreen extends StatelessWidget {
         return 'orange';
       case 'soporte':
         return 'green';
+      case 'pago':
+        return 'purple';
       default:
         return 'grey';
     }
@@ -78,12 +83,14 @@ class NotificationsScreen extends StatelessWidget {
                       Fmt.relative(asStr(n['created_at'])),
                     ].join(' · '),
                     left: IconDisc(_icon(asStr(n['tipo'])), tone: _tone(asStr(n['tipo']))),
-                    chevron: asStr(n['tipo']) == 'duelo' || asStr(n['tipo']) == 'soporte',
+                    chevron: asStr(n['tipo']) == 'duelo' || asStr(n['tipo']) == 'soporte' || (asStr(n['tipo']) == 'pago' && !app.isAdmin),
                     onTap: asStr(n['tipo']) == 'duelo'
                         ? () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const DuelosScreen()))
                         : (asStr(n['tipo']) == 'soporte'
                             ? () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const SoporteScreen()))
-                            : null),
+                            : (asStr(n['tipo']) == 'pago' && !app.isAdmin
+                                ? () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const PremiumScreen()))
+                                : null)),
                     right: asBool(n['leida'])
                         ? null
                         : Container(width: 9, height: 9, decoration: const BoxDecoration(color: C.gold, shape: BoxShape.circle)),

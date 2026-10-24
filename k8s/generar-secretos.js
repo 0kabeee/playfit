@@ -22,9 +22,23 @@ const NUEVAS = [
   ['N8N_TOKEN', () => crypto.randomBytes(32).toString('hex')],
   ['N8N_ENCRYPTION_KEY', () => crypto.randomBytes(32).toString('hex')],
   ['# Fase 13: notificaciones push. Pega aqui en UNA linea el base64 del JSON de la cuenta de servicio de Firebase (ver k8s/README.md).'],
-  ['FCM_SERVICE_ACCOUNT', () => '']
+  ['FCM_SERVICE_ACCOUNT', () => ''],
+  ['# Fase 14: pagos con Wompi (SANDBOX). Copialas del panel de comercios de Wompi > Desarrolladores (llave privada prv_test_... y secreto de eventos test_events_...).'],
+  ['WOMPI_PRIVATE_KEY', () => ''],
+  ['WOMPI_EVENTS_SECRET', () => '']
 ];
-const lineasNuevas = (faltan) => NUEVAS.filter(([k, gen]) => !gen || faltan.includes(k)).map(([k, gen]) => (gen ? `${k}=${gen()}` : k));
+// Un comentario solo se escribe si alguna de las claves que lo siguen (hasta el proximo comentario) falta.
+function lineasNuevas(faltan) {
+  const salida = [];
+  let comentario = null;
+  for (const [k, gen] of NUEVAS) {
+    if (!gen) { comentario = k; continue; }
+    if (!faltan.includes(k)) continue;
+    if (comentario) { salida.push(comentario); comentario = null; }
+    salida.push(`${k}=${gen()}`);
+  }
+  return salida;
+}
 
 if (fs.existsSync(destino) && !process.argv.includes('--force')) {
   const actual = fs.readFileSync(destino, 'utf8');
