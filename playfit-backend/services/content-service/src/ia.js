@@ -6,14 +6,14 @@
 //  5) Mensajes sobre PAGOS / Premium tampoco van al modelo: se transfieren a un humano (chat de Soporte, Fase 12).
 //  6) (Fase 13) El modelo es un AGENTE: puede llamar funciones (ver agente.js). Las que cambian datos solo quedan
 //     como PROPUESTA hasta que el usuario toca Confirmar en la app.
-//  7) (Fase 14) PlayFit Premium: la MEMORIA del agente y un cupo diario mayor son Premium. Sin Premium el modelo no
-//     recibe la funcion guardar_preferencia ni lo guardado (lo guardado no se borra: vuelve si renueva).
+//  7) (Fase 14) PlayFit Premium SUMA, no quita: memoria y voz son para todos. Premium tiene un cupo diario mayor
+//     (y en la Fase 15, rutinas con IA sin limite y ajuste semanal).
 const { one, select, insert, run, tx, E, AppError, rbac, soporte, eventos, clock, premium: PREM } = require('@playfit/shared');
 const agente = require('./agente');
 
 const MAX_MENSAJE = 1000;
 const limiteDiario = (esPremium = false) => (esPremium
-  ? Number(process.env.IA_LIMITE_PREMIUM || 60)
+  ? Number(process.env.IA_LIMITE_PREMIUM || 100)
   : Number(process.env.IA_LIMITE_DIARIO || 20));
 
 const SENALES_ALARMA = /dolor (fuerte )?(en el )?pecho|dolor de pecho|desmay|mareo (fuerte|intenso)|falta de aire|no puedo respirar|palpitaciones|vision borrosa|me duele (mucho|demasiado)|lesion grave/;
@@ -35,12 +35,12 @@ const MENSAJE_ALARMA = 'Lo que describes puede ser una senal de alerta. Deten el
 
 const VALOR_LEGIBLE = (v) => String(v).replace(/_/g, ' ');
 
-async function construirSystemPrompt(estudianteId, { hoy = clock.hoy(), catalogo = null, memoria = null, acciones = [], premium = true } = {}) {
+async function construirSystemPrompt(estudianteId, { hoy = clock.hoy(), catalogo = null, memoria = null, acciones = [] } = {}) {
   const flags = await select(
     `SELECT f.codigo, f.descripcion FROM estudiante_flags ef JOIN flags_clinicos f ON f.codigo=ef.flag_codigo
      WHERE ef.estudiante_id=:e AND f.codigo<>'SIN_RESTRICCIONES' ORDER BY f.codigo`, { e: estudianteId });
   const cat = catalogo || await agente.catalogoPara(estudianteId);
-  const mem = premium ? (memoria || await agente.leerMemoria(estudianteId)) : [];
+  const mem = memoria || await agente.leerMemoria(estudianteId);
   const lineas = [
     'Eres el asistente de PlayFit, una app de entrenamiento para estudiantes universitarios.',
     'Das consejos generales de tecnica, rutinas basicas y habitos saludables, en espanol, en tono cercano y breve (maximo 120 palabras).',
@@ -52,9 +52,7 @@ async function construirSystemPrompt(estudianteId, { hoy = clock.hoy(), catalogo
     '- registrar_sesion y crear_reto_squad solo PROPONEN: la app muestra una tarjeta y el usuario decide. Nunca digas que algo ya quedo registrado o creado.',
     '- Si te falta un dato (series, repeticiones, meta, dias), pregunta antes de proponer.',
     '- consultar_progreso para hablar de su racha, XP, sesiones o retos con datos reales.',
-    premium
-      ? '- guardar_preferencia cuando el usuario te diga su objetivo, experiencia, dias, horario, minutos por sesion o equipo.'
-      : '- El usuario NO es Premium: no puedes recordar sus preferencias entre conversaciones. Si te pide que recuerdes algo, dile que la memoria del asistente es parte de PlayFit Premium (se pide en Perfil > PlayFit Premium) y responde con lo que te diga en este chat.',
+    '- guardar_preferencia cuando el usuario te diga su objetivo, experiencia, dias, horario, minutos por sesion o equipo.',
     '- Para rutinas usa SOLO ejercicios del catalogo y nunca los marcados EVITAR. Adapta la rutina a lo que recuerdas del usuario.',
     '- transferir_a_humano si pide una persona o tiene un problema de cuenta que no puedes resolver.',
     '',
@@ -74,9 +72,7 @@ async function construirSystemPrompt(estudianteId, { hoy = clock.hoy(), catalogo
     lineas.push('Restricciones de seguridad del estudiante (respetalas SIEMPRE al recomendar ejercicios):');
     for (const f of flags) lineas.push(`- ${f.codigo}: ${f.descripcion}`);
   } else lineas.push('El estudiante no tiene restricciones registradas.');
-  if (!premium) {
-    // sin memoria: no se le pide al modelo que pregunte para guardar
-  } else if (mem.length) {
+  if (mem.length) {
     lineas.push('Lo que el usuario te conto de si mismo (preferencias guardadas):');
     for (const m of mem) lineas.push(`- ${agente.MEMORIA[m.clave] ? agente.MEMORIA[m.clave].etiqueta : m.clave}: ${VALOR_LEGIBLE(m.valor)}`);
   } else lineas.push('Aun no sabes sus preferencias; si es natural, preguntale su objetivo y con cuantos dias cuenta.');
@@ -139,13 +135,13 @@ async function chat(actor, { conversacionId = null, mensaje } = {}, { llm } = {}
       const hoy = clock.hoy();
       const catalogo = await agente.catalogoPara(actor.id);
       const acciones = conv ? await select('SELECT resumen, estado FROM ia_acciones WHERE conversacion_id=:c ORDER BY id DESC LIMIT 3', { c: conv.id }) : [];
-      const system = await construirSystemPrompt(actor.id, { hoy, catalogo, acciones: acciones.reverse(), premium: esPremium });
+      const system = await construirSystemPrompt(actor.id, { hoy, catalogo, acciones: acciones.reverse() });
       flagsAplicados = (await select(`SELECT flag_codigo FROM estudiante_flags WHERE estudiante_id=:e AND flag_codigo<>'SIN_RESTRICCIONES'`, { e: actor.id })).map((f) => f.flag_codigo);
       const historial = conv ? (await select('SELECT rol,contenido FROM mensajes_ia WHERE conversacion_id=:c ORDER BY id DESC LIMIT 10', { c: conv.id })).reverse() : [];
-      ejecutor = agente.crearEjecutor(actor, { catalogo, hoy, premium: esPremium });
+      ejecutor = agente.crearEjecutor(actor, { catalogo, hoy });
       respuesta = await llm.generate({
         system, history: historial.map((h) => ({ role: h.rol, text: h.contenido })), userMessage: mensaje.trim(),
-        tools: agente.funcionesPara(esPremium), ejecutarFuncion: ejecutor.ejecutar
+        tools: agente.FUNCIONES, ejecutarFuncion: ejecutor.ejecutar
       });
       if (typeof respuesta === 'string' && respuesta.trim()) respuesta = corregirPromesas(respuesta, ejecutor.estado);
       if (typeof respuesta !== 'string' || !respuesta.trim()) {

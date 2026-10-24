@@ -1,8 +1,7 @@
-// PlayFit Premium (Fase 14). Lo que se paga es la PERSONALIZACION del agente de IA:
-//  - memoria del agente (recuerda objetivo, nivel, horario, equipo...) entre conversaciones
-//  - mas mensajes al asistente por dia
-//  - voz del asistente (dictar y escuchar las respuestas)
-// Todo lo demas (rachas, XP, squads, retos, duelos, ranking, camara, tecnica) sigue siendo gratis.
+// PlayFit Premium (Fase 14). Premium SUMA personalizacion con IA; no le quita nada al plan gratis:
+// el asistente con memoria y voz, rachas, XP, squads, retos, duelos, ranking, camara y tecnica son para todos.
+// Premium: mas mensajes al asistente (100 al dia en vez de 20) y, desde la Fase 15, rutinas armadas por la IA
+// sin limite y ajuste automatico semanal segun las sesiones registradas.
 //
 // El estado vive en usuarios.premium_hasta (UTC). Cada cambio queda en premium_movimientos (auditoria).
 const { one, insert, run } = require('./db');
@@ -13,9 +12,9 @@ const PREMIUM = {
   MAX_CORTESIA_DIAS: 90
 };
 const BENEFICIOS = [
-  'El asistente recuerda tu objetivo, nivel, horario y equipo',
-  'Mas mensajes al asistente cada dia',
-  'Habla con el asistente y escucha sus respuestas (voz)'
+  'Más mensajes al asistente: 100 al día (gratis: 20)',
+  'Rutinas armadas por la IA sin límite (próximamente)',
+  'Ajuste automático de tu rutina cada semana según lo que entrenas (próximamente)'
 ];
 
 // 'YYYY-MM-DD HH:MM:SS' (UTC, asi llegan las fechas de la BD) -> Date

@@ -3,7 +3,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import '../common.dart';
-import 'premium.dart';
 import 'soporte.dart';
 
 class _Msg {
@@ -98,10 +97,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
   Future<void> _alternarVoz() async {
     final nuevo = !_leerEnVoz;
-    if (nuevo && !app.isPremium) {
-      await pedirPremium(context, 'Escuchar al asistente');
-      return;
-    }
     setState(() => _leerEnVoz = nuevo);
     if (!nuevo) await _tts.stop();
     toast(nuevo ? 'Leeré mis respuestas en voz alta' : 'Ya no leeré en voz alta', icon: nuevo ? 'volume-2' : 'volume-x');
@@ -112,7 +107,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   }
 
   Future<void> _hablar(String texto) async {
-    if (!_leerEnVoz || !app.isPremium || texto.trim().isEmpty) return;
+    if (!_leerEnVoz || texto.trim().isEmpty) return;
     try {
       for (final idioma in const ['es-CO', 'es-MX', 'es-US', 'es-ES']) {
         if (await _tts.isLanguageAvailable(idioma) == true) {
@@ -129,10 +124,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
   Future<void> _microfono() async {
     if (_sending) return;
-    if (!app.isPremium && !_escuchando) {
-      await pedirPremium(context, 'Hablarle al asistente');
-      return;
-    }
     if (_escuchando) {
       await _stt.stop();
       if (mounted) setState(() => _escuchando = false);
@@ -184,10 +175,6 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
   // ---------------------------------------------------------------- memoria
   Future<void> _verMemoria() async {
-    if (!app.isPremium) {
-      await pedirPremium(context, 'La memoria del asistente');
-      return;
-    }
     List<Map<String, dynamic>> mem;
     try {
       mem = asList(await app.api.get('/api/content/ai/memory'));

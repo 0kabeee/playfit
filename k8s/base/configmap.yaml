@@ -31,7 +31,7 @@ data:
   N8N_WEBHOOK_URL: http://n8n:5678/webhook
   PUSH_INTERVALO_SEG: "10"
   # Fase 14: PlayFit Premium y pagos con Wompi en SANDBOX (las llaves secretas van en secrets.env)
-  IA_LIMITE_PREMIUM: "60"
+  IA_LIMITE_PREMIUM: "100"
   PREMIUM_PRECIO_COP: "9900"
   WOMPI_ENV: sandbox
   WOMPI_PUBLIC_KEY: ""          # pub_test_... (no es secreta); ponla en el overlay

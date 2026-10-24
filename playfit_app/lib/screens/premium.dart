@@ -4,7 +4,7 @@ import '../common.dart';
 import 'soporte.dart';
 
 // ====================================================================== PLAYFIT PREMIUM (Fase 14)
-// Lo que se paga es la personalizacion del asistente de IA: memoria, voz y mas mensajes al dia.
+// Premium SUMA personalizacion con IA y no le quita nada al plan gratis (memoria y voz son para todos).
 // El pago se hace en el checkout de Wompi (sandbox = pago de prueba); PlayFit nunca ve los datos de pago.
 
 String precioCop(int pesos) {
@@ -60,31 +60,6 @@ Future<void> abrirCheckout(String url) async {
   }
   final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
   if (!ok) toast('No pude abrir el navegador', type: ToastType.error);
-}
-
-/// Hoja que se muestra cuando alguien sin Premium toca una función Premium (voz, memoria).
-Future<void> pedirPremium(BuildContext context, String que) async {
-  await showPfSheet<void>(
-    context,
-    (ctx) => Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(children: [
-          const IconDisc('sparkles', tone: 'purple', size: 36),
-          const SizedBox(width: 10),
-          Expanded(child: Text('$que es Premium', style: Tx.display(size: 19))),
-        ]),
-        const SizedBox(height: 10),
-        Text('Con PlayFit Premium el asistente se adapta a ti: recuerda tu objetivo y tu horario, te deja hablarle y te responde en voz alta.',
-            style: Tx.body(size: 13, color: C.inkSoft, height: 1.45)),
-        const SizedBox(height: 16),
-        PfButton('Ver PlayFit Premium', kind: BtnKind.gold, icon: 'sparkles', onPressed: () {
-          Navigator.pop(ctx);
-          Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const PremiumScreen()));
-        }),
-      ],
-    ),
-  );
 }
 
 /// Tarjeta de un enlace de pago dentro del chat de Soporte.
@@ -150,9 +125,9 @@ class PremiumScreen extends StatelessWidget {
           final sandbox = asStr(d['ambiente']) != 'production';
           return PfList(onRefresh: reload, children: [
             if (activo)
-              MascotNote('yeah', '¡Eres Premium! Tu asistente te recuerda y puedes hablarle. Activo hasta el ${fechaPremium(asStr(d['premium_hasta']))}.')
+              MascotNote('yeah', '¡Eres Premium! Tienes más mensajes con el asistente. Activo hasta el ${fechaPremium(asStr(d['premium_hasta']))}.')
             else
-              const MascotNote('energizado', 'Haz que el asistente se adapte a ti: que recuerde tu objetivo, te escuche y te hable.'),
+              const MascotNote('energizado', 'Lleva la personalización con IA más lejos: más mensajes con el asistente y rutinas hechas a tu medida.'),
             PfCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -174,7 +149,7 @@ class PremiumScreen extends StatelessWidget {
                         Expanded(child: Text(b, style: Tx.body(size: 13, height: 1.4))),
                       ]),
                     ),
-                  Text('Rachas, XP, squads, retos, duelos, ranking, cámara y técnica siguen siendo gratis.',
+                  Text('El plan gratis no pierde nada: asistente con memoria y voz, rachas, XP, squads, retos, duelos, ranking, cámara y técnica.',
                       style: Tx.body(size: 11.5, color: C.inkMute, height: 1.4)),
                 ],
               ),

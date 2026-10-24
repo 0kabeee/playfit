@@ -222,7 +222,7 @@ async function progreso(estudianteId, hoy) {
 // ---------------------------------------------------------------- ejecutor
 // Crea el ejecutor de funciones para UN mensaje. Lo que hay que guardar en la BD (propuesta, transferencia)
 // queda en `estado` y lo escribe ia.chat() en su transaccion final.
-function crearEjecutor(actor, { catalogo, hoy, premium = true }) {
+function crearEjecutor(actor, { catalogo, hoy }) {
   const estado = { propuesta: null, transferir: null, memoria: [], llamadas: [] };
   const ejecutar = async (nombre, args = {}) => {
     estado.llamadas.push(nombre);
@@ -241,7 +241,6 @@ function crearEjecutor(actor, { catalogo, hoy, premium = true }) {
         return { ok: true, pendiente_de_confirmacion: true, resumen: p.resumen, instruccion: 'Muestra el resumen y pidele que toque Confirmar en la tarjeta. NO digas que ya quedo hecho.' };
       }
       case 'guardar_preferencia': {
-        if (!premium) return { ok: false, error: 'la memoria del asistente es parte de PlayFit Premium; este usuario no es Premium. No digas que lo guardaste.' };
         const v = validarMemoria(args.clave, args.valor);
         if (v.error) return { ok: false, error: v.error };
         await guardarMemoria(actor.id, args.clave, v.valor);
@@ -258,10 +257,7 @@ function crearEjecutor(actor, { catalogo, hoy, premium = true }) {
   return { ejecutar, estado };
 }
 
-// Sin Premium el modelo no recibe la funcion de memoria (Fase 14).
-const funcionesPara = (premium) => (premium ? FUNCIONES : FUNCIONES.filter((f) => f.name !== 'guardar_preferencia'));
-
 module.exports = {
-  MEMORIA, FUNCIONES, funcionesPara, validarMemoria, leerMemoria, guardarMemoria, catalogoPara, buscarEjercicio,
+  MEMORIA, FUNCIONES, validarMemoria, leerMemoria, guardarMemoria, catalogoPara, buscarEjercicio,
   prepararSesion, prepararReto, progreso, crearEjecutor
 };

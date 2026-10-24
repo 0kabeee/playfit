@@ -113,7 +113,7 @@ class PerfilTab extends StatelessWidget {
                   title: app.isPremium ? 'Eres Premium' : 'Hazte Premium',
                   sub: app.isPremium
                       ? 'Activo hasta el ${fechaPremium(asStr(app.user['premium_hasta']))}'
-                      : 'Asistente con memoria, voz y más mensajes',
+                      : 'Más mensajes con el asistente y rutinas a tu medida',
                   left: const IconDisc('sparkles', tone: 'purple'),
                   right: app.isPremium ? const PfBadge('Premium', tone: 'purple') : null,
                   chevron: true,

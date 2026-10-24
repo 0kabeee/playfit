@@ -10,7 +10,6 @@ const soc = require('@playfit/social-service');
 const auth = require('@playfit/auth-service');
 const adminSvc = require('@playfit/auth-service/src/admin');
 const { ia } = require('@playfit/content-service');
-const agente = require('@playfit/content-service/src/agente');
 const { one, select, sequelize, wompi, premium } = require('@playfit/shared');
 const { sentencias } = require('@playfit/shared/src/migrate');
 
@@ -250,7 +249,7 @@ test('admin: Premium de cortesia (suma dias) y revocar; queda en el historial y 
 });
 
 // ---------------------------------------------------------------- lo que cambia con Premium en el asistente
-test('asistente: sin Premium no hay memoria ni funcion para guardarla; con Premium si y el cupo diario es mayor', async () => {
+test('asistente: memoria y funciones iguales con o sin Premium; Premium solo suma cupo diario', async () => {
   process.env.IA_LIMITE_PREMIUM = '6';
   await darConsentimientoIA(8);
   await sequelize.query("INSERT INTO ia_memoria (estudiante_id,clave,valor) VALUES (8,'objetivo','fuerza')");
@@ -262,23 +261,20 @@ test('asistente: sin Premium no hay memoria ni funcion para guardarla; con Premi
       return 'Te ayudo con tu rutina.';
     }
   };
+  // plan gratis: el asistente recuerda y puede guardar preferencias (Premium no le quita nada al gratis)
   const r1 = await ia.chat(S.SEBAS, { mensaje: 'armame una rutina' }, { llm });
   assert.equal(r1.premium, false);
-  assert.ok(!recibido[0].tools.some((f) => f.name === 'guardar_preferencia'), 'sin Premium el modelo no recibe la funcion');
-  assert.doesNotMatch(recibido[0].system, /Objetivo: fuerza/);
-  assert.match(recibido[0].system, /NO es Premium/);
-  assert.equal(recibido[0].ultimo.ok, false, 'aunque el modelo la llame, no se guarda');
-  assert.equal(await contar("SELECT COUNT(*) AS n FROM ia_memoria WHERE estudiante_id=8 AND clave='horario'"), 0);
-  assert.deepEqual(r1.memoria_actualizada, []);
+  assert.ok(recibido[0].tools.some((f) => f.name === 'guardar_preferencia'));
+  assert.match(recibido[0].system, /Objetivo: fuerza/);
+  assert.equal(recibido[0].ultimo.ok, true);
+  assert.deepEqual(r1.memoria_actualizada.map((m) => m.clave), ['horario']);
 
+  // con Premium: lo mismo, y mas mensajes al dia
   await pagos.darCortesia(S.ADMIN, 8, { dias: 30 });
   const r2 = await ia.chat(S.SEBAS, { conversacionId: r1.conversacion_id, mensaje: 'y para manana?' }, { llm });
   assert.equal(r2.premium, true);
-  assert.ok(recibido[1].tools.some((f) => f.name === 'guardar_preferencia'));
-  assert.match(recibido[1].system, /Objetivo: fuerza/);
-  assert.equal(recibido[1].ultimo.ok, true);
+  assert.deepEqual(recibido[1].tools.map((f) => f.name), recibido[0].tools.map((f) => f.name));
   assert.equal(r2.restantes_hoy, r1.restantes_hoy - 1 + 3, 'el cupo Premium (6) es mayor que el gratis (3)');
-  assert.equal(agente.funcionesPara(false).length, agente.FUNCIONES.length - 1);
   delete process.env.IA_LIMITE_PREMIUM;
 });
 
